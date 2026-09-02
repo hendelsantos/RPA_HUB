@@ -5,15 +5,20 @@ from typing import Any
 from pydantic import ValidationError
 
 from rpa_core.engine.models import WorkflowDefinition
+from rpa_core.engine.sandbox import DEFAULT_MAX_STEP_TIMEOUT_MS
 
 
 TARGET_STEPS = {"click", "fill", "secret_fill", "select", "press", "wait_for", "assert_text", "download"}
 PATH_STEPS = {"file_create_folder", "file_delete", "file_write_text", "file_read_text"}
 SOURCE_DESTINATION_STEPS = {"file_copy", "file_move", "file_zip", "file_unzip"}
 DESKTOP_XY_STEPS = {"desktop_move", "desktop_drag"}
+MAX_RETRY = 5
 
 
-def validate_workflow(workflow_data: dict[str, Any]) -> list[str]:
+def validate_workflow(
+    workflow_data: dict[str, Any],
+    max_step_timeout_ms: int = DEFAULT_MAX_STEP_TIMEOUT_MS,
+) -> list[str]:
     errors: list[str] = []
     try:
         workflow = WorkflowDefinition.model_validate(workflow_data)
@@ -25,6 +30,12 @@ def validate_workflow(workflow_data: dict[str, Any]) -> list[str]:
 
     for index, step in enumerate(workflow.steps, start=1):
         prefix = f"Passo {index} ({step.type})"
+        if step.timeout_ms is not None and step.timeout_ms <= 0:
+            errors.append(f"{prefix}: timeout_ms deve ser positivo.")
+        if step.timeout_ms is not None and step.timeout_ms > max_step_timeout_ms:
+            errors.append(f"{prefix}: timeout_ms excede o limite de {max_step_timeout_ms} ms.")
+        if step.retry is not None and step.retry > MAX_RETRY:
+            errors.append(f"{prefix}: retry deve ser no maximo {MAX_RETRY}.")
         if step.type == "goto" and not step.url:
             errors.append(f"{prefix}: informe a URL.")
         if step.type in TARGET_STEPS and step.target is None:

@@ -3,17 +3,22 @@ from __future__ import annotations
 import base64
 import os
 
+from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from infra.db.models import Secret
+from infra.settings import LEGACY_DEFAULT_SECRET_KEY, load_fernet_key
 from infra.time import utc_now
+
+
+FERNET_PREFIX = "gAAAA"
 
 
 class SecretStore:
     def __init__(self, session: Session) -> None:
         self.session = session
-        self.key = os.getenv("RPA_HUB_SECRET_KEY", "dev-local-key").encode("utf-8")
+        self.fernet = Fernet(load_fernet_key())
 
     def list(self) -> list[Secret]:
         return list(self.session.scalars(select(Secret).order_by(Secret.name)))
@@ -34,14 +39,31 @@ class SecretStore:
         secret = self.session.scalar(select(Secret).where(Secret.name == name))
         if secret is None:
             return None
-        return self._decrypt(secret.encrypted_value)
+        value = self._decrypt(secret.encrypted_value)
+        if value is None:
+            return None
+        if secret.encrypted_value and not secret.encrypted_value.startswith(FERNET_PREFIX):
+            secret.encrypted_value = self._encrypt(value)
+            self.session.flush()
+        return value
 
     def _encrypt(self, value: str) -> str:
-        data = value.encode("utf-8")
-        encrypted = bytes(byte ^ self.key[index % len(self.key)] for index, byte in enumerate(data))
-        return base64.urlsafe_b64encode(encrypted).decode("ascii")
+        return self.fernet.encrypt(value.encode("utf-8")).decode("ascii")
 
-    def _decrypt(self, value: str) -> str:
-        encrypted = base64.urlsafe_b64decode(value.encode("ascii"))
-        data = bytes(byte ^ self.key[index % len(self.key)] for index, byte in enumerate(encrypted))
-        return data.decode("utf-8")
+    def _decrypt(self, stored: str) -> str | None:
+        if not stored:
+            return None
+        try:
+            return self.fernet.decrypt(stored.encode("ascii")).decode("utf-8")
+        except (InvalidToken, ValueError):
+            pass
+        return self._legacy_decrypt(stored)
+
+    def _legacy_decrypt(self, stored: str) -> str | None:
+        key = os.getenv("RPA_HUB_LEGACY_SECRET_KEY", LEGACY_DEFAULT_SECRET_KEY).encode("utf-8")
+        try:
+            encrypted = base64.urlsafe_b64decode(stored.encode("ascii"))
+            data = bytes(byte ^ key[index % len(key)] for index, byte in enumerate(encrypted))
+            return data.decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            return None

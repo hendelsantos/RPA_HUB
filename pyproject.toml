@@ -5,6 +5,7 @@ description = "Hub RPA ensinavel com FastAPI, SQLite e Playwright."
 requires-python = ">=3.11"
 dependencies = [
   "apscheduler>=3.10.4",
+  "cryptography>=42.0.0",
   "fastapi>=0.115.0",
   "jinja2>=3.1.4",
   "playwright>=1.46.0",

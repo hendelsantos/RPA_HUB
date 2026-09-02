@@ -49,7 +49,7 @@ class RobotUpdate(BaseModel):
 
 
 class RobotDelete(BaseModel):
-    password: str
+    password: str = ""
 
 
 class VersionOut(BaseModel):
@@ -191,7 +191,7 @@ class TeachFinish(BaseModel):
 
 class TeachRecord(BaseModel):
     url: str
-    seconds: int = 60
+    seconds: int = Field(default=60, ge=1, le=300)
 
 
 class TeachStart(BaseModel):

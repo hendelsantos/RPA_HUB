@@ -1,6 +1,8 @@
 # Análise Técnica e Plano de Profissionalização — HUB RPA
 
 > Data: 02/09/2026 · Escopo: 38 arquivos Python (~2.700 LOC), frontend, scripts, testes e configuração.
+>
+> **Status (02/09/2026):** P0 implementado — autenticação por API key em toda a API (modo local sem chave restrito a loopback), criptografia Fernet dos secrets com migração automática dos valores XOR legados, sandbox de steps (zip-slip, env filtrado no subprocess, allowlists opcionais de comandos e raízes, bounds de timeout/retry), recorder parametriza valores digitados em vez de persisti-los, endpoint `/health` e remoção do `--reload` dos scripts de start. Próximo: P1 (quebra do `main.py`, fila de jobs, Alembic, logging).
 
 ## 1. Visão geral
 

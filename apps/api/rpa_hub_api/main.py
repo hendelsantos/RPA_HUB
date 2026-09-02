@@ -3,7 +3,6 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from datetime import datetime
 from hmac import compare_digest
-import os
 from pathlib import Path
 from typing import AsyncIterator
 
@@ -12,6 +11,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from apps.api.rpa_hub_api.auth import require_api_key
 from apps.api.rpa_hub_api.schemas import (
     DashboardOut,
     GuidedRobotCreate,
@@ -48,6 +48,7 @@ from domain.workers import WorkerRepository
 from infra.db import SessionLocal, init_db
 from infra.db.models import AuditEvent, Robot, RobotSecret, RobotVersion, Run, Schedule, Secret, Worker
 from infra.scheduler import HubScheduler
+from infra.settings import settings
 from rpa_core.engine.validation import validate_workflow
 from rpa_core.recorder import RecorderManager, record_browser_session
 from rpa_core.variables import normalize_url
@@ -56,7 +57,6 @@ from rpa_core.variables import normalize_url
 BASE_DIR = Path(__file__).resolve().parents[3]
 ARTIFACTS_DIR = BASE_DIR / "infra" / "artifacts"
 WEB_INDEX = BASE_DIR / "apps" / "web" / "src" / "index.html"
-DELETE_PASSWORD = os.getenv("RPA_HUB_DELETE_PASSWORD", "hendel#")
 
 scheduler = HubScheduler(BASE_DIR, ARTIFACTS_DIR)
 recorder_manager = RecorderManager()
@@ -73,7 +73,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         scheduler.shutdown()
 
 
-app = FastAPI(title="HUB RPA", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="HUB RPA",
+    version="0.2.0",
+    lifespan=lifespan,
+    dependencies=[Depends(require_api_key)],
+)
 
 
 def get_session():
@@ -87,6 +92,15 @@ def get_session():
 @app.get("/", response_class=HTMLResponse)
 def web_app() -> str:
     return WEB_INDEX.read_text(encoding="utf-8")
+
+
+@app.get("/health")
+def health(session: Session = Depends(get_session)) -> dict[str, str]:
+    try:
+        session.execute(select(1))
+    except Exception:
+        return {"status": "degraded", "database": "error"}
+    return {"status": "ok", "version": app.version}
 
 
 @app.post("/robots", response_model=RobotOut)
@@ -191,9 +205,11 @@ def reconfigure_robot(robot_id: int, session: Session = Depends(get_session)):
 
 
 @app.delete("/robots/{robot_id}")
-def delete_robot(robot_id: int, payload: RobotDelete, session: Session = Depends(get_session)):
-    if not compare_digest(payload.password, DELETE_PASSWORD):
-        raise HTTPException(status_code=403, detail="Senha incorreta para excluir o robo.")
+def delete_robot(robot_id: int, payload: RobotDelete | None = None, session: Session = Depends(get_session)):
+    if settings.delete_password:
+        provided = (payload.password if payload else "") or ""
+        if not compare_digest(provided, settings.delete_password):
+            raise HTTPException(status_code=403, detail="Senha de confirmacao incorreta para excluir o robo.")
     repo = RobotRepository(session)
     robot = repo.get_robot(robot_id)
     if not robot:
@@ -238,7 +254,7 @@ def validate_robot_version(version_id: int, session: Session = Depends(get_sessi
     version = session.get(RobotVersion, version_id)
     if not version:
         raise HTTPException(status_code=404, detail="Versao nao encontrada.")
-    errors = validate_workflow(version.workflow)
+    errors = validate_workflow(version.workflow, settings.max_step_timeout_ms)
     return WorkflowValidationOut(valid=not errors, errors=errors)
 
 
@@ -247,7 +263,7 @@ def publish_version(version_id: int, session: Session = Depends(get_session)):
     existing = session.get(RobotVersion, version_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Versao nao encontrada.")
-    errors = validate_workflow(existing.workflow)
+    errors = validate_workflow(existing.workflow, settings.max_step_timeout_ms)
     if errors:
         raise HTTPException(status_code=400, detail={"message": "Corrija o fluxo antes de publicar.", "errors": errors})
     version = RobotRepository(session).publish_version(version_id)
@@ -267,7 +283,7 @@ def activate_robot(robot_id: int, session: Session = Depends(get_session)):
     existing = repo.latest_version(robot_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Versao nao encontrada.")
-    errors = validate_workflow(existing.workflow)
+    errors = validate_workflow(existing.workflow, settings.max_step_timeout_ms)
     if errors:
         raise HTTPException(status_code=400, detail={"message": "Este robo ainda nao tem um ensino valido para ativar.", "errors": errors})
     version = repo.publish_version(existing.id)
@@ -345,7 +361,7 @@ def stop_teach_session(robot_id: int, session_id: str, session: Session = Depend
         raise HTTPException(status_code=404, detail="Sessao de gravacao nao encontrada.")
     if recording.status == "failed":
         raise HTTPException(status_code=500, detail=recording.error or "Falha na gravacao.")
-    workflow = {"inputs": {}, "steps": recording.workflow_steps()}
+    workflow = recording.workflow()
     version = RobotRepository(session).create_next_version(robot_id, workflow)
     if version is None:
         raise HTTPException(status_code=404, detail="Robo nao encontrado.")
@@ -359,8 +375,7 @@ def record_teach_session(robot_id: int, payload: TeachRecord, session: Session =
     if RobotRepository(session).get_robot(robot_id) is None:
         raise HTTPException(status_code=404, detail="Robo nao encontrado.")
     events = record_browser_session(payload.url, seconds=payload.seconds)
-    workflow = {"inputs": {}, "steps": events}
-    version = RobotRepository(session).create_next_version(robot_id, workflow)
+    version = RobotRepository(session).create_next_version(robot_id, events)
     if version is None:
         raise HTTPException(status_code=404, detail="Robo nao encontrado.")
     audit(session, "teach.recorded", "robot_version", version.id, {"events": len(events)})

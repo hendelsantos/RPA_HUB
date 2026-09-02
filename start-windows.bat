@@ -44,9 +44,17 @@ echo Garantindo navegador Chromium do Playwright...
 python -m playwright install chromium
 if errorlevel 1 exit /b 1
 
+if "%APP_HOST%"=="0.0.0.0" (
+  if "%RPA_HUB_API_KEY%"=="" (
+    echo AVISO: APP_HOST=0.0.0.0 sem RPA_HUB_API_KEY definida.
+    echo Acessos de outras maquinas serao bloqueados. Defina RPA_HUB_API_KEY para usar o Hub em rede.
+    echo.
+  )
+)
+
 echo.
 echo HUB RPA iniciado em: http://%APP_HOST%:%APP_PORT%
 echo Documentacao da API: http://%APP_HOST%:%APP_PORT%/docs
 echo.
 
-python -m uvicorn apps.api.rpa_hub_api.main:app --reload --host %APP_HOST% --port %APP_PORT%
+python -m uvicorn apps.api.rpa_hub_api.main:app --host %APP_HOST% --port %APP_PORT%

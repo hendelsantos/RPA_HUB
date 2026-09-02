@@ -112,6 +112,11 @@
       pre, #workflow { background: #101820; color: #edf4f2; font-family: Consolas, monospace; }
       pre { border-radius: 7px; max-height: 300px; overflow: auto; padding: 12px; white-space: pre-wrap; }
       .callout { background: #eef4f8; border-left: 3px solid #557890; color: #405465; font-size: 13px; line-height: 1.5; margin: 12px 0; padding: 10px 12px; }
+      .key-panel { align-items: center; background: rgba(16, 24, 32, 0.72); display: flex; height: 100vh; justify-content: center; left: 0; position: fixed; top: 0; width: 100vw; z-index: 50; }
+      .key-panel form { background: #fff; border-radius: 10px; box-shadow: 0 18px 50px rgba(16, 24, 32, 0.35); display: grid; gap: 10px; max-width: 380px; padding: 22px; width: calc(100vw - 40px); }
+      .key-panel h3 { margin: 0; }
+      .key-panel p { color: var(--muted); font-size: 13px; margin: 0; }
+      .key-panel input { width: 100%; }
       .hidden { display: none !important; }
       @media (max-width: 1120px) {
         .shell, .layout, .layout-left, .metrics { grid-template-columns: 1fr; }
@@ -128,6 +133,15 @@
     </style>
   </head>
   <body>
+    <div id="api-key-panel" class="key-panel hidden">
+      <form id="api-key-form">
+        <h3>Conectar ao HUB RPA</h3>
+        <p>Este servidor exige chave de acesso. Informe a chave definida na variavel RPA_HUB_API_KEY do servidor.</p>
+        <input id="api-key-input" type="password" placeholder="Chave de acesso" autocomplete="off" />
+        <button type="submit">Conectar</button>
+        <button type="button" id="api-key-cancel" class="secondary">Cancelar</button>
+      </form>
+    </div>
     <div class="shell">
       <nav>
         <h1>HUB RPA</h1>
@@ -471,10 +485,51 @@
         desktop_wait: [],
       };
 
+      const API_KEY_STORAGE = "rpa_hub_api_key";
+      function currentApiKey() { return localStorage.getItem(API_KEY_STORAGE) || ""; }
+      let apiKeyPanelPromise = null;
+      function askForApiKey() {
+        if (apiKeyPanelPromise) return apiKeyPanelPromise;
+        apiKeyPanelPromise = new Promise((resolve) => {
+          const panel = document.querySelector("#api-key-panel");
+          const form = document.querySelector("#api-key-form");
+          const input = document.querySelector("#api-key-input");
+          panel.classList.remove("hidden");
+          input.value = currentApiKey();
+          const finish = (value) => {
+            panel.classList.add("hidden");
+            form.onsubmit = null;
+            document.querySelector("#api-key-cancel").onclick = null;
+            apiKeyPanelPromise = null;
+            resolve(value);
+          };
+          form.onsubmit = (event) => {
+            event.preventDefault();
+            const value = input.value.trim();
+            if (!value) return finish(null);
+            localStorage.setItem(API_KEY_STORAGE, value);
+            document.querySelector("#api-status").textContent = "API conectada";
+            finish(value);
+          };
+          document.querySelector("#api-key-cancel").onclick = () => finish(null);
+          input.focus();
+        });
+        return apiKeyPanelPromise;
+      }
+
       async function api(path, options = {}) {
-        const response = await fetch(path, { headers: { "Content-Type": "application/json", ...(options.headers || {}) }, ...options });
+        const send = () => fetch(path, {
+          ...options,
+          headers: { "Content-Type": "application/json", "X-API-Key": currentApiKey(), ...(options.headers || {}) },
+        });
+        let response = await send();
+        if (response.status === 401) {
+          const key = await askForApiKey();
+          if (key) response = await send();
+        }
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
+          if (response.status === 401) throw new Error("Acesso nao autorizado. Verifique a chave de acesso.");
           if (body.detail?.errors) throw new Error(body.detail.errors.join(" | "));
           if (body.detail?.message) throw new Error(body.detail.message);
           throw new Error(typeof body.detail === "string" ? body.detail : `Erro HTTP ${response.status}`);
@@ -876,10 +931,16 @@
       async function deleteRobot(event, id) {
         event.stopPropagation();
         const robot = robots.find((item) => item.id === Number(id));
-        const password = window.prompt(`Digite a senha para excluir "${robot?.name || "este robo"}":`);
-        if (password === null) return;
+        if (!window.confirm(`Excluir "${robot?.name || "este robo"}"? Esta acao nao pode ser desfeita.`)) return;
         try {
-          await api(`/robots/${id}`, { method: "DELETE", body: JSON.stringify({ password }) });
+          try {
+            await api(`/robots/${id}`, { method: "DELETE" });
+          } catch (error) {
+            if (!String(error.message).includes("Senha")) throw error;
+            const password = window.prompt(`Este servidor exige senha de confirmacao para excluir "${robot?.name || "este robo"}":`);
+            if (password === null) return;
+            await api(`/robots/${id}`, { method: "DELETE", body: JSON.stringify({ password }) });
+          }
           if (selectedRobot?.id === Number(id)) {
             selectedRobot = null;
             selectedVersion = null;

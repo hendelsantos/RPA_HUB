@@ -49,14 +49,33 @@ document.addEventListener('change', (event) => {
   const target = event.target;
   if (target && ['INPUT','TEXTAREA','SELECT'].includes(target.tagName)) {
     const isPassword = target.type && target.type.toLowerCase() === 'password';
+    const isSelect = target.tagName === 'SELECT';
     const rpaEvent = isPassword
       ? { type: 'secret_fill', target: selectorFor(target), secret: 'defina_um_segredo', meta: { sensitive: true } }
-      : { type: target.tagName === 'SELECT' ? 'select' : 'fill', target: selectorFor(target), value: target.value };
+      : isSelect
+        ? { type: 'select', target: selectorFor(target), value: target.value }
+        : { type: 'fill', target: selectorFor(target), value: '', meta: { recorded_input: true } };
     window.__rpaEvents.push(rpaEvent);
     if (window.rpaRecord) window.rpaRecord(rpaEvent);
   }
 }, true);
 """
+
+
+def parameterize_events(events: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    steps: list[dict[str, Any]] = []
+    inputs: dict[str, str] = {}
+    counter = 0
+    for event in events:
+        step = {key: value for key, value in event.items() if key != "meta"}
+        meta = event.get("meta") or {}
+        if meta.get("recorded_input"):
+            counter += 1
+            name = f"campo_{counter}"
+            step["value"] = "{{" + name + "}}"
+            inputs[name] = ""
+        steps.append(step)
+    return steps, inputs
 
 
 @dataclass
@@ -69,8 +88,9 @@ class RecordingSession:
     error: str | None = None
     thread: threading.Thread | None = None
 
-    def workflow_steps(self) -> list[dict[str, Any]]:
-        return [{"type": "goto", "url": self.url}, *self.events]
+    def workflow(self) -> dict[str, Any]:
+        steps, inputs = parameterize_events(self.events)
+        return {"inputs": inputs, "steps": [{"type": "goto", "url": self.url}, *steps]}
 
 
 class RecorderManager:
@@ -125,7 +145,7 @@ class RecorderManager:
             session.error = str(exc)
 
 
-def record_browser_session(url: str, seconds: int = 60) -> list[dict[str, Any]]:
+def record_browser_session(url: str, seconds: int = 60) -> dict[str, Any]:
     url = normalize_url(url) or url
     events: list[dict[str, Any]] = []
     with sync_playwright() as playwright:
@@ -145,4 +165,5 @@ def record_browser_session(url: str, seconds: int = 60) -> list[dict[str, Any]]:
             browser.close()
         except PlaywrightError:
             pass
-    return [{"type": "goto", "url": url}, *events]
+    steps, inputs = parameterize_events(events)
+    return {"inputs": inputs, "steps": [{"type": "goto", "url": url}, *steps]}

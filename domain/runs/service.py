@@ -9,8 +9,10 @@ from sqlalchemy.orm import Session
 from domain.robots import RobotRepository
 from domain.secrets import SecretStore
 from infra.db.models import Artifact, RobotVersion, Run, RunStep
+from infra.settings import settings
 from infra.time import utc_now
 from rpa_core.engine import WorkflowExecutor
+from rpa_core.engine.sandbox import StepSandbox
 
 
 class RunService:
@@ -52,7 +54,17 @@ class RunService:
 
         try:
             secret_store = SecretStore(self.session)
-            artifacts = WorkflowExecutor(run_dir, headless=headless, secret_resolver=secret_store.resolve).run(
+            sandbox = StepSandbox(
+                allowed_roots=settings.allowed_roots,
+                allowed_commands=frozenset(settings.allowed_commands),
+                max_step_timeout_ms=settings.max_step_timeout_ms,
+            )
+            artifacts = WorkflowExecutor(
+                run_dir,
+                headless=headless,
+                secret_resolver=secret_store.resolve,
+                sandbox=sandbox,
+            ).run(
                 version.workflow,
                 inputs=run.inputs,
                 log=log,

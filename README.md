@@ -46,7 +46,7 @@ Para trocar host ou porta:
 Linux:
 
 ```bash
-APP_HOST=0.0.0.0 APP_PORT=8020 ./start-linux.sh
+APP_HOST=0.0.0.0 APP_PORT=8020 RPA_HUB_API_KEY=uma-chave-forte ./start-linux.sh
 ```
 
 Windows:
@@ -54,25 +54,42 @@ Windows:
 ```bat
 set APP_HOST=0.0.0.0
 set APP_PORT=8020
+set RPA_HUB_API_KEY=uma-chave-forte
 start-windows.bat
 ```
 
 Comando manual equivalente:
 
 ```bash
-uvicorn apps.api.rpa_hub_api.main:app --reload --host 127.0.0.1 --port 8010
+uvicorn apps.api.rpa_hub_api.main:app --host 127.0.0.1 --port 8010
 ```
 
 Acesse:
 
 - Hub: http://127.0.0.1:8010
 - API: http://127.0.0.1:8010/docs
+- Status: http://127.0.0.1:8010/health
 
 O banco padrao e `rpa_hub.db` na raiz do projeto. Para usar outro SQLite:
 
 ```bash
-RPA_HUB_DATABASE_URL=sqlite:///./outro_banco.db uvicorn apps.api.rpa_hub_api.main:app --reload --port 8010
+RPA_HUB_DATABASE_URL=sqlite:///./outro_banco.db uvicorn apps.api.rpa_hub_api.main:app --port 8010
 ```
+
+## Seguranca e acesso
+
+- **Acesso local (padrao):** sem configuracao, o Hub aceita somente conexoes da propria maquina (`127.0.0.1`). Nenhuma senha e necessaria.
+- **Acesso em rede:** defina `RPA_HUB_API_KEY` no servidor. Todas as chamadas da API passam a exigir o cabecalho `X-API-Key`. A interface web pede a chave automaticamente na primeira conexao e guarda no navegador. Chamadas sem chave ou com chave errada recebem `401`.
+- **Credenciais:** os valores do cofre sao cifrados com AES (Fernet). A chave e gerada automaticamente no arquivo `.rpa_hub_secret.key` (na raiz, ignorado pelo git) ou definida pela variavel `RPA_HUB_SECRET_KEY`. Para usar em rede ou backup, gere uma chave com:
+
+  ```bash
+  python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+  ```
+
+- **Senha de exclusao (opcional):** por padrao, excluir robo exige apenas a chave da API. Para pedir uma confirmacao extra, defina `RPA_HUB_DELETE_PASSWORD`.
+- **Limites dos passos:** `timeout_ms` e limitado (padrao 1 hora, ajustavel com `RPA_HUB_MAX_STEP_TIMEOUT_MS`) e `retry` aceita no maximo 5.
+- **Sandbox (opcional):** `RPA_HUB_ALLOWED_ROOTS` restringe os passos de arquivo a pastas especificas e `RPA_HUB_ALLOWED_COMMANDS` restringe quais programas o passo `command_run` pode executar. Exemplo: `RPA_HUB_ALLOWED_ROOTS=C:\RPA,D:\Entradas RPA_HUB_ALLOWED_COMMANDS=python,powershell`. Sem essas variaveis, o robo opera como antes, mas comandos nunca recebem as variaveis de ambiente internas do servidor (como chaves e senhas).
+- A extracao de ZIP valida cada arquivo e bloqueia arquivos que tentem escapar da pasta de destino.
 
 ## Rodar worker local
 
@@ -156,7 +173,7 @@ Na lista **Meus robos**:
 - **Executar** roda o robo ativo em segundo plano.
 - **Excluir** remove o robo, suas versoes, agendas, execucoes e vinculos de credenciais.
 
-Para excluir, a tela pede uma senha. A senha padrao e `hendel#`. Para trocar sem alterar codigo, defina a variavel `RPA_HUB_DELETE_PASSWORD` antes de iniciar o Hub.
+A exclusao pede confirmacao. Se o servidor tiver `RPA_HUB_DELETE_PASSWORD` definida, ele tambem pede essa senha.
 
 ## Exemplo interno de workflow
 
@@ -296,7 +313,7 @@ Isso representa 07:00 de segunda a sexta. Quando `apscheduler` estiver instalado
 
 ## Modo Ensinar
 
-Endpoints principais:
+Endpoints principais (adicione o cabecalho `-H 'X-API-Key: ...'` quando o Hub estiver com `RPA_HUB_API_KEY` configurada):
 
 ```bash
 curl -X POST http://127.0.0.1:8010/robots/1/teach/start \
@@ -310,7 +327,7 @@ Depois finalize usando o `session_id` retornado:
 curl -X POST http://127.0.0.1:8010/robots/1/teach/stop/SESSION_ID
 ```
 
-Ele abre um Chromium visivel, grava eventos ate o usuario finalizar, detecta links de download e nao salva valores digitados em campos de senha.
+Ele abre um Chromium visivel, grava eventos ate o usuario finalizar, detecta links de download, nao salva valores digitados em campos de senha e converte campos de texto digitados em variaveis `campo_1`, `campo_2`... para voce preencher na execucao (o valor digitado nao fica salvo).
 
 ## Testes
 

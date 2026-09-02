@@ -20,3 +20,5 @@ infra/artifacts/*
 .env
 .env.*
 !.env.example
+
+.rpa_hub_secret.key

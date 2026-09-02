@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -13,6 +12,7 @@ from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError, sy
 
 from rpa_core.desktop import DesktopController
 from rpa_core.engine.models import Target, WorkflowDefinition
+from rpa_core.engine.sandbox import StepSandbox
 from rpa_core.variables import normalize_url, render_template
 
 
@@ -33,10 +33,17 @@ DESKTOP_STEPS = {
 
 
 class WorkflowExecutor:
-    def __init__(self, artifacts_dir: Path, headless: bool = False, secret_resolver: SecretResolver | None = None) -> None:
+    def __init__(
+        self,
+        artifacts_dir: Path,
+        headless: bool = False,
+        secret_resolver: SecretResolver | None = None,
+        sandbox: StepSandbox | None = None,
+    ) -> None:
         self.artifacts_dir = artifacts_dir
         self.headless = headless
         self.secret_resolver = secret_resolver
+        self.sandbox = sandbox or StepSandbox()
         self._desktop: DesktopController | None = None
 
     def run(
@@ -86,6 +93,7 @@ class WorkflowExecutor:
 
     def _execute_step(self, page: Page | None, step, context: dict[str, Any], index: int) -> list[Path]:
         artifacts: list[Path] = []
+        self.sandbox.check_timeout(step.timeout_ms)
 
         if step.type == "goto":
             page = self._require_page(page, step.type)
@@ -206,18 +214,20 @@ class WorkflowExecutor:
             destination = self._path(step.destination, context, "Etapa file_unzip requer destination.")
             destination.mkdir(parents=True, exist_ok=True)
             with zipfile.ZipFile(source) as archive:
+                self._check_zip_members(archive, destination)
                 archive.extractall(destination)
 
         elif step.type == "command_run":
             if not step.command:
                 raise ValueError("Etapa command_run requer command.")
             command = [render_template(step.command, context), *[render_template(arg, context) for arg in step.args]]
+            self.sandbox.check_command(command[0])
             cwd = self._path(step.cwd, context, "Etapa command_run recebeu cwd vazio.") if step.cwd else None
             env = {key: render_template(value, context) for key, value in step.env.items()}
             result = subprocess.run(
                 command,
                 cwd=cwd,
-                env={**os.environ, **env} if env else None,
+                env=self.sandbox.child_env(env),
                 capture_output=True,
                 check=False,
                 text=True,
@@ -283,7 +293,15 @@ class WorkflowExecutor:
     def _path(self, value: str | None, context: dict[str, Any], error: str) -> Path:
         if not value:
             raise ValueError(error)
-        return Path(render_template(value, context)).expanduser()
+        path = Path(render_template(value, context)).expanduser()
+        return self.sandbox.check_path(path)
+
+    def _check_zip_members(self, archive: zipfile.ZipFile, destination: Path) -> None:
+        destination_resolved = destination.resolve()
+        for member in archive.namelist():
+            target = (destination / member).resolve()
+            if target != destination_resolved and destination_resolved not in target.parents:
+                raise ValueError(f"Arquivo suspeito dentro do ZIP (fora da pasta de destino): {member}")
 
     def _ensure_can_write(self, path: Path, overwrite: bool) -> None:
         if path.exists() and not overwrite:
