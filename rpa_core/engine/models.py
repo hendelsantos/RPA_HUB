@@ -22,6 +22,10 @@ StepType = Literal[
     "file_move",
     "file_delete",
     "file_write_text",
+    "file_read_text",
+    "file_zip",
+    "file_unzip",
+    "command_run",
 ]
 
 
@@ -43,6 +47,12 @@ class WorkflowStep(BaseModel):
     path: str | None = None
     source: str | None = None
     destination: str | None = None
+    command: str | None = None
+    args: list[str] = Field(default_factory=list)
+    cwd: str | None = None
+    env: dict[str, str] = Field(default_factory=dict)
+    output_name: str | None = None
+    variable: str | None = None
     secret: str | None = None
     key: str | None = None
     overwrite: bool = False

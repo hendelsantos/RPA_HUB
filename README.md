@@ -146,6 +146,10 @@ O mesmo robo tambem pode executar passos locais no Windows ou Linux:
 - `file_copy`: copia arquivo ou pasta.
 - `file_move`: move arquivo ou pasta.
 - `file_delete`: apaga arquivo ou pasta.
+- `file_read_text`: le um arquivo de texto e guarda em uma variavel do fluxo.
+- `file_zip`: compacta arquivo ou pasta em ZIP.
+- `file_unzip`: extrai um ZIP.
+- `command_run`: executa um programa ou comando local.
 
 Exemplo:
 
@@ -163,6 +167,32 @@ Exemplo:
 ```
 
 No Linux, use caminhos como `/home/usuario/rpa/relatorio.xlsx`. Quando o fluxo tiver somente passos de arquivo/pasta, o Hub nao abre o navegador.
+
+Exemplo chamando um programa/script externo:
+
+```json
+{
+  "inputs": {},
+  "steps": [
+    {
+      "type": "command_run",
+      "command": "python",
+      "args": ["scripts/processar.py", "--cliente", "HMB"],
+      "cwd": "C:\\RPA",
+      "output_name": "saida-processamento",
+      "timeout_ms": 120000
+    },
+    {
+      "type": "file_zip",
+      "source": "C:\\RPA\\saida",
+      "destination": "C:\\RPA\\saida.zip",
+      "overwrite": true
+    }
+  ]
+}
+```
+
+Para comandos do terminal, prefira informar o programa e os argumentos separados. Exemplos: `["-c", "echo ok"]` com `bash`, ou `["/c", "dir"]` com `cmd`.
 
 ## Agendas
 

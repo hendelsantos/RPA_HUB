@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import os
 import time
 from collections.abc import Callable
 from pathlib import Path
 import shutil
+import subprocess
 from typing import Any
+import zipfile
 
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError, sync_playwright
 
@@ -171,6 +174,49 @@ class WorkflowExecutor:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(render_template(step.value, context) or "", encoding="utf-8")
 
+        elif step.type == "file_read_text":
+            path = self._path(step.path, context, "Etapa file_read_text requer path.")
+            if not step.variable:
+                raise ValueError("Etapa file_read_text requer variable.")
+            context[step.variable] = path.read_text(encoding="utf-8")
+
+        elif step.type == "file_zip":
+            source = self._path(step.source, context, "Etapa file_zip requer source.")
+            destination = self._path(step.destination, context, "Etapa file_zip requer destination.")
+            self._ensure_can_write(destination, step.overwrite)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            self._zip(source, destination)
+            artifacts.append(destination)
+
+        elif step.type == "file_unzip":
+            source = self._path(step.source, context, "Etapa file_unzip requer source.")
+            destination = self._path(step.destination, context, "Etapa file_unzip requer destination.")
+            destination.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(source) as archive:
+                archive.extractall(destination)
+
+        elif step.type == "command_run":
+            if not step.command:
+                raise ValueError("Etapa command_run requer command.")
+            command = [render_template(step.command, context), *[render_template(arg, context) for arg in step.args]]
+            cwd = self._path(step.cwd, context, "Etapa command_run recebeu cwd vazio.") if step.cwd else None
+            env = {key: render_template(value, context) for key, value in step.env.items()}
+            result = subprocess.run(
+                command,
+                cwd=cwd,
+                env={**os.environ, **env} if env else None,
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=step.timeout_ms / 1000,
+            )
+            if step.output_name:
+                output_path = self.artifacts_dir / f"{render_template(step.output_name, context)}.txt"
+                output_path.write_text((result.stdout or "") + (result.stderr or ""), encoding="utf-8")
+                artifacts.append(output_path)
+            if result.returncode != 0:
+                raise RuntimeError(f"Comando falhou com codigo {result.returncode}: {result.stderr or result.stdout}")
+
         return artifacts
 
     def _require_page(self, page: Page | None, step_type: str) -> Page:
@@ -186,6 +232,15 @@ class WorkflowExecutor:
     def _ensure_can_write(self, path: Path, overwrite: bool) -> None:
         if path.exists() and not overwrite:
             raise FileExistsError(f"Caminho ja existe: {path}. Marque overwrite=true para substituir.")
+
+    def _zip(self, source: Path, destination: Path) -> None:
+        with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            if source.is_dir():
+                for path in source.rglob("*"):
+                    if path.is_file():
+                        archive.write(path, path.relative_to(source))
+            else:
+                archive.write(source, source.name)
 
     def _locator(self, page: Page, target: Target | None):
         if target is None:

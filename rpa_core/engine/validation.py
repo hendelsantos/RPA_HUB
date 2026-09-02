@@ -8,8 +8,8 @@ from rpa_core.engine.models import WorkflowDefinition
 
 
 TARGET_STEPS = {"click", "fill", "secret_fill", "select", "press", "wait_for", "assert_text", "download"}
-PATH_STEPS = {"file_create_folder", "file_delete", "file_write_text"}
-SOURCE_DESTINATION_STEPS = {"file_copy", "file_move"}
+PATH_STEPS = {"file_create_folder", "file_delete", "file_write_text", "file_read_text"}
+SOURCE_DESTINATION_STEPS = {"file_copy", "file_move", "file_zip", "file_unzip"}
 
 
 def validate_workflow(workflow_data: dict[str, Any]) -> list[str]:
@@ -44,5 +44,9 @@ def validate_workflow(workflow_data: dict[str, Any]) -> list[str]:
             errors.append(f"{prefix}: informe o destino.")
         if step.type == "file_write_text" and step.value is None:
             errors.append(f"{prefix}: informe o texto.")
+        if step.type == "file_read_text" and not step.variable:
+            errors.append(f"{prefix}: informe a variavel de destino.")
+        if step.type == "command_run" and not step.command:
+            errors.append(f"{prefix}: informe o comando.")
 
     return errors
