@@ -48,6 +48,10 @@ class RobotUpdate(BaseModel):
     status: str | None = None
 
 
+class RobotDelete(BaseModel):
+    password: str
+
+
 class VersionOut(BaseModel):
     id: int
     robot_id: int

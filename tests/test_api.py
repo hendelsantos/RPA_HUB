@@ -118,6 +118,34 @@ def test_robot_secret_links_hide_values_and_reference_secret_name():
         assert client.get(f"/robots/{robot['id']}/secrets").json() == []
 
 
+def test_reconfigure_robot_creates_new_draft_version():
+    with TestClient(app) as client:
+        robot = client.post("/robots/demo").json()
+        latest = client.get(f"/robots/{robot['id']}/versions/latest").json()
+
+        response = client.post(f"/robots/{robot['id']}/reconfigure")
+
+        assert response.status_code == 200
+        reconfigured = response.json()
+        assert reconfigured["version"] == latest["version"] + 1
+        assert reconfigured["status"] == "draft"
+        assert client.get(f"/robots/{robot['id']}").json()["status"] == "draft"
+
+
+def test_delete_robot_requires_password_and_removes_robot():
+    with TestClient(app) as client:
+        robot = client.post("/robots", json={"name": "Robo para excluir"}).json()
+
+        forbidden = client.request("DELETE", f"/robots/{robot['id']}", json={"password": "errada"})
+        assert forbidden.status_code == 403
+        assert client.get(f"/robots/{robot['id']}").status_code == 200
+
+        deleted = client.request("DELETE", f"/robots/{robot['id']}", json={"password": "hendel#"})
+        assert deleted.status_code == 200
+        assert deleted.json() == {"ok": True}
+        assert client.get(f"/robots/{robot['id']}").status_code == 404
+
+
 def test_publish_requires_valid_workflow():
     with TestClient(app) as client:
         robot = client.post("/robots", json={"name": "Robo Incompleto"}).json()

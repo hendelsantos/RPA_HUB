@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import desc, select, update
+from sqlalchemy import delete, desc, select, update
 from sqlalchemy.orm import Session
 
-from infra.db.models import Robot, RobotVersion
+from infra.db.models import Artifact, Robot, RobotSecret, RobotVersion, Run, RunStep, Schedule
 
 
 class RobotRepository:
@@ -121,3 +121,29 @@ class RobotRepository:
         version.robot.status = "active"
         self.session.flush()
         return version
+
+    def reconfigure_robot(self, robot_id: int) -> RobotVersion | None:
+        robot = self.get_robot(robot_id)
+        if robot is None:
+            return None
+        robot.status = "draft"
+        version = self.create_next_version(robot_id)
+        self.session.flush()
+        return version
+
+    def delete_robot(self, robot_id: int) -> bool:
+        robot = self.get_robot(robot_id)
+        if robot is None:
+            return False
+
+        run_ids = list(self.session.scalars(select(Run.id).where(Run.robot_id == robot_id)))
+        if run_ids:
+            self.session.execute(delete(RunStep).where(RunStep.run_id.in_(run_ids)))
+            self.session.execute(delete(Artifact).where(Artifact.run_id.in_(run_ids)))
+            self.session.execute(delete(Run).where(Run.id.in_(run_ids)))
+
+        self.session.execute(delete(Schedule).where(Schedule.robot_id == robot_id))
+        self.session.execute(delete(RobotSecret).where(RobotSecret.robot_id == robot_id))
+        self.session.delete(robot)
+        self.session.flush()
+        return True

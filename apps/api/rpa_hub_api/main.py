@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import datetime
+from hmac import compare_digest
+import os
 from pathlib import Path
 from typing import AsyncIterator
 
@@ -14,6 +16,7 @@ from apps.api.rpa_hub_api.schemas import (
     DashboardOut,
     GuidedRobotCreate,
     RobotCreate,
+    RobotDelete,
     RobotOut,
     RobotSecretAttach,
     RobotSecretOut,
@@ -53,6 +56,7 @@ from rpa_core.variables import normalize_url
 BASE_DIR = Path(__file__).resolve().parents[3]
 ARTIFACTS_DIR = BASE_DIR / "infra" / "artifacts"
 WEB_INDEX = BASE_DIR / "apps" / "web" / "src" / "index.html"
+DELETE_PASSWORD = os.getenv("RPA_HUB_DELETE_PASSWORD", "hendel#")
 
 scheduler = HubScheduler(BASE_DIR, ARTIFACTS_DIR)
 recorder_manager = RecorderManager()
@@ -173,6 +177,31 @@ def update_robot(robot_id: int, payload: RobotUpdate, session: Session = Depends
     audit(session, "robot.updated", "robot", robot.id, payload.model_dump(exclude_none=True))
     session.commit()
     return _robot_out(robot, latest.id if latest else None)
+
+
+@app.post("/robots/{robot_id}/reconfigure", response_model=VersionOut)
+def reconfigure_robot(robot_id: int, session: Session = Depends(get_session)):
+    repo = RobotRepository(session)
+    version = repo.reconfigure_robot(robot_id)
+    if not version:
+        raise HTTPException(status_code=404, detail="Robo nao encontrado.")
+    audit(session, "robot.reconfigured", "robot", robot_id, {"version_id": version.id, "version": version.version})
+    session.commit()
+    return version
+
+
+@app.delete("/robots/{robot_id}")
+def delete_robot(robot_id: int, payload: RobotDelete, session: Session = Depends(get_session)):
+    if not compare_digest(payload.password, DELETE_PASSWORD):
+        raise HTTPException(status_code=403, detail="Senha incorreta para excluir o robo.")
+    repo = RobotRepository(session)
+    robot = repo.get_robot(robot_id)
+    if not robot:
+        raise HTTPException(status_code=404, detail="Robo nao encontrado.")
+    audit(session, "robot.deleted", "robot", robot_id, {"name": robot.name})
+    repo.delete_robot(robot_id)
+    session.commit()
+    return {"ok": True}
 
 
 @app.post("/robots/{robot_id}/versions", response_model=VersionOut)

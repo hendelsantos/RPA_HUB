@@ -105,6 +105,18 @@ Depois que um robo ja foi ensinado uma vez, ele pode ser usado quando voce quise
 
 Robos em `draft` ainda podem ser editados ou ensinados novamente. Robos `active` possuem uma versao publicada pronta para execucao.
 
+## Gerenciar robos
+
+Na lista **Meus robos**:
+
+- **Continuar** abre o robo para editar os passos atuais.
+- **Reconfigurar** cria uma nova versao `draft` a partir da versao atual e deixa o robo pronto para ajuste.
+- **Ativar** aprova o ultimo ensino valido.
+- **Executar** roda o robo ativo em segundo plano.
+- **Excluir** remove o robo, suas versoes, agendas, execucoes e vinculos de credenciais.
+
+Para excluir, a tela pede uma senha. A senha padrao e `hendel#`. Para trocar sem alterar codigo, defina a variavel `RPA_HUB_DELETE_PASSWORD` antes de iniciar o Hub.
+
 ## Exemplo interno de workflow
 
 ```json

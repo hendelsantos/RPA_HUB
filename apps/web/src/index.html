@@ -525,8 +525,10 @@
               <small>${esc(robot.description || "Sem descricao")} · ${esc(robot.status)}</small>
               <div class="robot-actions">
                 <button class="secondary tiny" onclick="continueRobot(event, ${robot.id})">Continuar</button>
+                <button class="secondary tiny" onclick="reconfigureRobot(event, ${robot.id})">Reconfigurar</button>
                 <button class="secondary tiny" onclick="activateRobot(event, ${robot.id})">Ativar</button>
                 <button class="tiny" ${robot.status === "active" ? "" : "disabled"} onclick="runRobotNow(event, ${robot.id})">Executar</button>
+                <button class="danger tiny" onclick="deleteRobot(event, ${robot.id})">Excluir</button>
               </div>
             </div>`).join("")
           : '<div class="empty">Nenhum robo criado ainda.</div>';
@@ -654,6 +656,35 @@
         event.stopPropagation();
         await selectRobot(id);
         await runSelected(true, "#project-message");
+      }
+      async function reconfigureRobot(event, id) {
+        event.stopPropagation();
+        try {
+          selectedVersion = await api(`/robots/${id}/reconfigure`, { method: "POST" });
+          await refreshAll();
+          await selectRobot(id);
+          showStage("teach");
+          setMessage("#robot-message", "Nova versao criada para reconfiguracao. Ajuste os passos e ative novamente.", "good");
+        } catch (error) { setMessage("#project-message", error.message, "bad"); }
+      }
+      async function deleteRobot(event, id) {
+        event.stopPropagation();
+        const robot = robots.find((item) => item.id === Number(id));
+        const password = window.prompt(`Digite a senha para excluir "${robot?.name || "este robo"}":`);
+        if (password === null) return;
+        try {
+          await api(`/robots/${id}`, { method: "DELETE", body: JSON.stringify({ password }) });
+          if (selectedRobot?.id === Number(id)) {
+            selectedRobot = null;
+            selectedVersion = null;
+            visualSteps = [];
+            robotSecrets = [];
+            renderSteps();
+            renderRobotSecrets();
+          }
+          await refreshAll();
+          setMessage("#project-message", "Robo excluido.", "good");
+        } catch (error) { setMessage("#project-message", error.message, "bad"); }
       }
       function useRobotSecret(event, linkId) {
         event.stopPropagation();
