@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, select, update
 from sqlalchemy.orm import Session
 
 from infra.db.models import Robot, RobotVersion
@@ -22,8 +22,7 @@ class RobotRepository:
         workflow: dict[str, Any] = {"inputs": {}, "steps": []}
         version = RobotVersion(robot_id=robot.id, version=1, status="draft", workflow=workflow)
         self.session.add(version)
-        self.session.commit()
-        self.session.refresh(robot)
+        self.session.flush()
         return robot
 
     def create_robot_with_workflow(
@@ -39,8 +38,7 @@ class RobotRepository:
         self.session.flush()
         version = RobotVersion(robot_id=robot.id, version=1, status="published" if publish else "draft", workflow=workflow)
         self.session.add(version)
-        self.session.commit()
-        self.session.refresh(robot)
+        self.session.flush()
         return robot
 
     def get_robot(self, robot_id: int) -> Robot | None:
@@ -65,8 +63,7 @@ class RobotRepository:
             robot.start_url = start_url
         if status is not None:
             robot.status = status
-        self.session.commit()
-        self.session.refresh(robot)
+        self.session.flush()
         return robot
 
     def latest_version(self, robot_id: int) -> RobotVersion | None:
@@ -83,8 +80,7 @@ class RobotRepository:
         if not version:
             return None
         version.workflow = workflow
-        self.session.commit()
-        self.session.refresh(version)
+        self.session.flush()
         return version
 
     def create_next_version(self, robot_id: int, workflow: dict[str, Any] | None = None) -> RobotVersion | None:
@@ -100,16 +96,19 @@ class RobotRepository:
             workflow=workflow if workflow is not None else (latest.workflow if latest else {"inputs": {}, "steps": []}),
         )
         self.session.add(version)
-        self.session.commit()
-        self.session.refresh(version)
+        self.session.flush()
         return version
 
     def publish_version(self, version_id: int) -> RobotVersion | None:
         version = self.session.get(RobotVersion, version_id)
         if not version:
             return None
+        self.session.execute(
+            update(RobotVersion)
+            .where(RobotVersion.robot_id == version.robot_id)
+            .values(status="archived")
+        )
         version.status = "published"
         version.robot.status = "active"
-        self.session.commit()
-        self.session.refresh(version)
+        self.session.flush()
         return version

@@ -5,8 +5,13 @@ import os
 os.environ["RPA_HUB_DATABASE_URL"] = "sqlite:///:memory:"
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from apps.api.rpa_hub_api.main import app
+from domain.robots import RobotRepository
+from domain.runs import RunService
+from infra.db.models import AuditEvent
+from infra.db.session import SessionLocal
 from rpa_core.variables import normalize_url
 
 
@@ -38,6 +43,16 @@ def test_create_robot_and_update_workflow():
 
         assert update_response.status_code == 200
         assert update_response.json()["workflow"] == workflow
+
+        with SessionLocal() as session:
+            event = session.scalar(
+                select(AuditEvent).where(
+                    AuditEvent.action == "robot.created",
+                    AuditEvent.entity_type == "robot",
+                    AuditEvent.entity_id == str(robot["id"]),
+                )
+            )
+            assert event is not None
 
 
 def test_operational_hub_endpoints():
@@ -85,6 +100,42 @@ def test_publish_requires_valid_workflow():
 
         publish = client.post(f"/robot-versions/{version['id']}/publish")
         assert publish.status_code == 400
+
+
+def test_run_executes_the_version_that_was_queued(monkeypatch, tmp_path):
+    captured_workflows = []
+
+    class FakeWorkflowExecutor:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def run(self, workflow, inputs, log):
+            captured_workflows.append(workflow)
+            log("INFO", "Fluxo fake executado.")
+            return []
+
+    monkeypatch.setattr("domain.runs.service.WorkflowExecutor", FakeWorkflowExecutor)
+
+    with TestClient(app):
+        with SessionLocal() as session:
+            repo = RobotRepository(session)
+            robot = repo.create_robot_with_workflow(
+                name="Robo versionado",
+                workflow={"inputs": {}, "steps": [{"type": "screenshot", "name": "v1"}]},
+                publish=True,
+            )
+            session.commit()
+
+            service = RunService(session, tmp_path, tmp_path / "artifacts")
+            run = service.create_run(robot.id, {})
+            session.commit()
+
+            repo.create_next_version(robot.id, {"inputs": {}, "steps": [{"type": "screenshot", "name": "v2"}]})
+            session.commit()
+
+            service.execute_run(run.id, headless=True)
+
+    assert captured_workflows == [{"inputs": {}, "steps": [{"type": "screenshot", "name": "v1"}]}]
 
 
 def test_normalize_url_adds_https():

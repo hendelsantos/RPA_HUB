@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
+from typing import AsyncIterator
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
@@ -50,21 +52,22 @@ BASE_DIR = Path(__file__).resolve().parents[3]
 ARTIFACTS_DIR = BASE_DIR / "infra" / "artifacts"
 WEB_INDEX = BASE_DIR / "apps" / "web" / "src" / "index.html"
 
-app = FastAPI(title="HUB RPA", version="0.1.0")
 scheduler = HubScheduler(BASE_DIR, ARTIFACTS_DIR)
 recorder_manager = RecorderManager()
 
 
-@app.on_event("startup")
-def startup() -> None:
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     init_db()
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     scheduler.start()
+    try:
+        yield
+    finally:
+        scheduler.shutdown()
 
 
-@app.on_event("shutdown")
-def shutdown() -> None:
-    scheduler.shutdown()
+app = FastAPI(title="HUB RPA", version="0.1.0", lifespan=lifespan)
 
 
 def get_session():
@@ -346,6 +349,7 @@ def worker_heartbeat(worker_id: int, payload: WorkerHeartbeat, session: Session 
     worker = WorkerRepository(session).heartbeat(worker_id, payload.status)
     if worker is None:
         raise HTTPException(status_code=404, detail="Worker nao encontrado.")
+    session.commit()
     return worker
 
 
@@ -383,6 +387,7 @@ def toggle_schedule(schedule_id: int, payload: ScheduleToggle, session: Session 
     schedule = ScheduleRepository(session).set_enabled(schedule_id, payload.enabled)
     if schedule is None:
         raise HTTPException(status_code=404, detail="Agenda nao encontrada.")
+    session.commit()
     scheduler.reload()
     return schedule
 

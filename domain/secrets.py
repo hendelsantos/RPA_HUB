@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import base64
 import os
-from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from infra.db.models import Secret
+from infra.time import utc_now
 
 
 class SecretStore:
@@ -26,9 +26,8 @@ class SecretStore:
         secret.description = description
         secret.secret_type = secret_type
         secret.encrypted_value = self._encrypt(value)
-        secret.updated_at = datetime.utcnow()
-        self.session.commit()
-        self.session.refresh(secret)
+        secret.updated_at = utc_now()
+        self.session.flush()
         return secret
 
     def resolve(self, name: str) -> str | None:

@@ -18,8 +18,7 @@ class ScheduleRepository:
     def create(self, robot_id: int, name: str, cron: str, inputs: dict[str, Any], enabled: bool = True) -> Schedule:
         schedule = Schedule(robot_id=robot_id, name=name, cron=cron, inputs=inputs, enabled=enabled)
         self.session.add(schedule)
-        self.session.commit()
-        self.session.refresh(schedule)
+        self.session.flush()
         return schedule
 
     def set_enabled(self, schedule_id: int, enabled: bool) -> Schedule | None:
@@ -27,6 +26,5 @@ class ScheduleRepository:
         if schedule is None:
             return None
         schedule.enabled = enabled
-        self.session.commit()
-        self.session.refresh(schedule)
+        self.session.flush()
         return schedule

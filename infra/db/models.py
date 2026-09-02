@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
@@ -12,6 +12,9 @@ from infra.db.session import Base
 
 class Robot(Base):
     __tablename__ = "robots"
+    __table_args__ = (
+        Index("ix_robots_status_created_at", "status", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(160), nullable=False)
@@ -25,6 +28,12 @@ class Robot(Base):
 
 class RobotVersion(Base):
     __tablename__ = "robot_versions"
+    __table_args__ = (
+        UniqueConstraint("robot_id", "version", name="uq_robot_versions_robot_version"),
+        CheckConstraint("status in ('draft', 'published', 'archived')", name="ck_robot_versions_status"),
+        Index("ix_robot_versions_robot_status", "robot_id", "status"),
+        Index("ix_robot_versions_robot_version", "robot_id", "version"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     robot_id: Mapped[int] = mapped_column(ForeignKey("robots.id"), nullable=False)
@@ -38,6 +47,12 @@ class RobotVersion(Base):
 
 class Run(Base):
     __tablename__ = "runs"
+    __table_args__ = (
+        CheckConstraint("status in ('QUEUED', 'RUNNING', 'SUCCESS', 'FAILED')", name="ck_runs_status"),
+        Index("ix_runs_created_at", "created_at"),
+        Index("ix_runs_status_created_at", "status", "created_at"),
+        Index("ix_runs_robot_created_at", "robot_id", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     robot_id: Mapped[int] = mapped_column(ForeignKey("robots.id"), nullable=False)
@@ -55,6 +70,9 @@ class Run(Base):
 
 class RunStep(Base):
     __tablename__ = "run_steps"
+    __table_args__ = (
+        Index("ix_run_steps_run_created_at", "run_id", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     run_id: Mapped[int] = mapped_column(ForeignKey("runs.id"), nullable=False)
@@ -68,6 +86,9 @@ class RunStep(Base):
 
 class Artifact(Base):
     __tablename__ = "artifacts"
+    __table_args__ = (
+        Index("ix_artifacts_run_id", "run_id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     run_id: Mapped[int] = mapped_column(ForeignKey("runs.id"), nullable=False)
@@ -80,6 +101,10 @@ class Artifact(Base):
 
 class Worker(Base):
     __tablename__ = "workers"
+    __table_args__ = (
+        CheckConstraint("max_concurrent_runs > 0", name="ck_workers_max_concurrent_runs_positive"),
+        Index("ix_workers_status", "status"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(160), nullable=False, unique=True)
@@ -105,6 +130,10 @@ class Secret(Base):
 
 class Schedule(Base):
     __tablename__ = "schedules"
+    __table_args__ = (
+        Index("ix_schedules_enabled", "enabled"),
+        Index("ix_schedules_robot_id", "robot_id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     robot_id: Mapped[int] = mapped_column(ForeignKey("robots.id"), nullable=False)
@@ -117,6 +146,11 @@ class Schedule(Base):
 
 class AuditEvent(Base):
     __tablename__ = "audit_events"
+    __table_args__ = (
+        Index("ix_audit_events_created_at", "created_at"),
+        Index("ix_audit_events_entity", "entity_type", "entity_id"),
+        Index("ix_audit_events_action", "action"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     actor: Mapped[str] = mapped_column(String(160), default="system")

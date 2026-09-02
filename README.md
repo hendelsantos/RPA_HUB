@@ -50,22 +50,17 @@ python apps/worker/local_worker.py --hub http://127.0.0.1:8010 --name AUTO-01 --
 ## Criar robo sem JSON
 
 1. Abra http://127.0.0.1:8010.
-2. Entre em **Robos**.
-3. Use **Novo robo guiado**.
-4. Escolha o que o robo deve fazer:
-   - Abrir um site e tirar evidencia.
-   - Entrar em um sistema.
-   - Entrar e baixar Excel.
-   - Filtrar datas e baixar relatorio.
-5. Preencha os campos pedidos pelo assistente.
-6. Clique em **Criar com assistente**.
-7. Revise os passos criados automaticamente.
-8. Clique em **Publicar**.
-9. Clique em **Executar visivel** para testar vendo o navegador.
+2. Entre em **Studio**.
+3. Em **1. Projeto do robo**, informe o nome, escolha a finalidade e indique o site inicial.
+4. Clique em **Criar e continuar**.
+5. Em **2. Ensinar**, clique em **Iniciar ensino**.
+6. O HUB abre o Chromium. Faca o processo normalmente no site.
+7. Volte ao HUB e clique em **Finalizar ensino**.
+8. Confira os passos e clique em **Aprovar ensino**.
+9. Em **3. Execucao**, escolha se o robo sera manual, diario, de segunda a sexta ou executado a cada hora.
+10. Salve a configuracao ou clique em **Executar em segundo plano**.
 
-Tambem e possivel usar **Gravar navegacao**: o HUB abre o Chromium, voce faz o processo manualmente e finaliza a gravacao quando terminar.
-
-O JSON continua existindo apenas no **Modo tecnico**. O usuario comum trabalha pela lista visual de passos.
+Para aprender o fluxo sem cadastrar um site, use **Criar teste pronto** na primeira etapa. O JSON fica disponivel somente em **Ferramentas avancadas**.
 
 ## Exemplo interno de workflow
 

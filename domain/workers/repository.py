@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from infra.db.models import Worker
+from infra.time import utc_now
 
 
 class WorkerRepository:
@@ -24,9 +23,8 @@ class WorkerRepository:
         worker.tags = tags
         worker.max_concurrent_runs = max_concurrent_runs
         worker.status = "online"
-        worker.last_heartbeat_at = datetime.utcnow()
-        self.session.commit()
-        self.session.refresh(worker)
+        worker.last_heartbeat_at = utc_now()
+        self.session.flush()
         return worker
 
     def heartbeat(self, worker_id: int, status: str = "online") -> Worker | None:
@@ -34,7 +32,6 @@ class WorkerRepository:
         if worker is None:
             return None
         worker.status = status
-        worker.last_heartbeat_at = datetime.utcnow()
-        self.session.commit()
-        self.session.refresh(worker)
+        worker.last_heartbeat_at = utc_now()
+        self.session.flush()
         return worker

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -9,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from domain.robots import RobotRepository
 from domain.secrets import SecretStore
-from infra.db.models import Artifact, Run, RunStep
+from infra.db.models import Artifact, RobotVersion, Run, RunStep
+from infra.time import utc_now
 from rpa_core.engine import WorkflowExecutor
 
 
@@ -29,20 +29,19 @@ class RunService:
             raise ValueError("Versao nao encontrada.")
         run = Run(robot_id=robot_id, robot_version_id=version.id, status="QUEUED", inputs=inputs)
         self.session.add(run)
-        self.session.commit()
-        self.session.refresh(run)
+        self.session.flush()
         return run
 
     def execute_run(self, run_id: int, headless: bool) -> Run:
         run = self.session.get(Run, run_id)
         if run is None:
             raise ValueError("Execucao nao encontrada.")
-        version = RobotRepository(self.session).latest_version(run.robot_id)
+        version = self.session.get(RobotVersion, run.robot_version_id)
         if version is None:
             raise ValueError("Versao nao encontrada.")
 
         run.status = "RUNNING"
-        run.started_at = datetime.utcnow()
+        run.started_at = utc_now()
         self.session.commit()
 
         run_dir = self.artifacts_dir / f"run-{run.id}"
@@ -67,7 +66,7 @@ class RunService:
             run.error = self._friendly_error(exc)
             log("ERROR", run.error, None)
         finally:
-            run.finished_at = datetime.utcnow()
+            run.finished_at = utc_now()
             self.session.commit()
             self.session.refresh(run)
 
