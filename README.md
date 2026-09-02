@@ -134,6 +134,18 @@ Exemplo:
 
 Na etapa **3. Execucao**, o Hub mostra essas entradas para voce alterar antes de rodar ou salvar uma agenda.
 
+## Modelos rapidos
+
+Em **Studio > Ensinar > Ferramentas avancadas**, use **Modelos rapidos** para inserir blocos prontos no robo:
+
+- **Pasta + arquivo**
+- **Copiar + ZIP**
+- **Executar comando**
+- **Abrir site + evidencia**
+- **Desktop simples**
+
+Depois de inserir um modelo, ajuste os campos, confira os passos e clique em **Aprovar ensino**.
+
 ## Gerenciar robos
 
 Na lista **Meus robos**:

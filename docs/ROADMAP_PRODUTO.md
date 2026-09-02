@@ -104,7 +104,7 @@ Melhoria:
 
 Melhoria:
 
-- Templates reutilizaveis de workflow.
+- Templates reutilizaveis de workflow. **Iniciado.**
 - Importar/exportar robos em JSON.
 - Duplicar robos existentes.
 

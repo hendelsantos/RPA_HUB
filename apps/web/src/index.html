@@ -242,6 +242,17 @@
                       <div class="toolbar"><button>Adicionar variavel</button></div>
                     </form>
                     <div class="robot-list" id="input-list"></div>
+                    <div class="panel-title" style="margin-top:18px">
+                      <h3>Modelos rapidos</h3>
+                      <p>Adicione blocos prontos e ajuste os campos depois.</p>
+                    </div>
+                    <div class="purpose-grid">
+                      <button type="button" class="secondary" onclick="addTemplateSteps('local_report')">Pasta + arquivo</button>
+                      <button type="button" class="secondary" onclick="addTemplateSteps('copy_and_zip')">Copiar + ZIP</button>
+                      <button type="button" class="secondary" onclick="addTemplateSteps('run_command')">Executar comando</button>
+                      <button type="button" class="secondary" onclick="addTemplateSteps('open_site')">Abrir site + evidencia</button>
+                      <button type="button" class="secondary" onclick="addTemplateSteps('desktop_notepad')">Desktop simples</button>
+                    </div>
                     <form id="step-form">
                       <div class="step-fields">
                         <div><label>Tipo do passo</label><select name="type" id="step-type">
@@ -569,6 +580,51 @@
       function removeInput(key) {
         delete visualInputs[key];
         renderInputs();
+      }
+      function ensureInput(key, value) {
+        if (!(key in visualInputs)) visualInputs[key] = value;
+      }
+      function addTemplateSteps(template) {
+        const templates = {
+          local_report: () => {
+            ensureInput("cliente", "HMB");
+            ensureInput("pasta_destino", "C:\\RPA\\{{cliente}}");
+            return [
+              { type: "file_create_folder", path: "{{pasta_destino}}", timeout_ms: 30000 },
+              { type: "file_write_text", path: "{{pasta_destino}}\\status.txt", value: "Processado para {{cliente}}", overwrite: true, timeout_ms: 30000 },
+            ];
+          },
+          copy_and_zip: () => {
+            ensureInput("pasta_origem", "C:\\Downloads");
+            ensureInput("pasta_destino", "C:\\RPA\\saida");
+            return [
+              { type: "file_copy", source: "{{pasta_origem}}", destination: "{{pasta_destino}}", overwrite: true, timeout_ms: 30000 },
+              { type: "file_zip", source: "{{pasta_destino}}", destination: "{{pasta_destino}}.zip", overwrite: true, timeout_ms: 30000 },
+            ];
+          },
+          run_command: () => [
+            { type: "command_run", command: "python", args: ["--version"], output_name: "saida-comando", timeout_ms: 30000 },
+          ],
+          open_site: () => {
+            ensureInput("site", "https://example.com");
+            return [
+              { type: "goto", url: "{{site}}", timeout_ms: 30000 },
+              { type: "screenshot", name: "evidencia-{{run_date}}", timeout_ms: 30000 },
+            ];
+          },
+          desktop_notepad: () => [
+            { type: "desktop_hotkey", keys: ["win", "r"], timeout_ms: 30000 },
+            { type: "desktop_type", value: "notepad", interval_ms: 20, timeout_ms: 30000 },
+            { type: "desktop_press", key: "enter", timeout_ms: 30000 },
+            { type: "desktop_wait", timeout_ms: 1000 },
+            { type: "desktop_screenshot", name: "desktop-{{run_date}}", timeout_ms: 30000 },
+          ],
+        };
+        if (!templates[template]) return;
+        visualSteps.push(...templates[template]());
+        renderSteps();
+        renderInputs();
+        setMessage("#robot-message", "Modelo adicionado. Ajuste os campos e confira os passos.", "good");
       }
       function collectRunInputs() {
         const form = document.querySelector("#run-inputs");
