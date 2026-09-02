@@ -26,6 +26,15 @@ StepType = Literal[
     "file_zip",
     "file_unzip",
     "command_run",
+    "desktop_move",
+    "desktop_click",
+    "desktop_double_click",
+    "desktop_drag",
+    "desktop_type",
+    "desktop_press",
+    "desktop_hotkey",
+    "desktop_screenshot",
+    "desktop_wait",
 ]
 
 
@@ -55,6 +64,12 @@ class WorkflowStep(BaseModel):
     variable: str | None = None
     secret: str | None = None
     key: str | None = None
+    keys: list[str] = Field(default_factory=list)
+    x: int | None = None
+    y: int | None = None
+    button: str = "left"
+    duration_ms: int = 0
+    interval_ms: int = 0
     overwrite: bool = False
     timeout_ms: int = 30000
     retry: int = 0

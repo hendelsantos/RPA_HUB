@@ -242,6 +242,11 @@
                           <option value="file_write_text">Criar arquivo texto</option>
                           <option value="file_read_text">Ler arquivo texto</option><option value="file_zip">Compactar ZIP</option>
                           <option value="file_unzip">Extrair ZIP</option><option value="command_run">Executar comando</option>
+                          <option value="desktop_move">Mover mouse</option><option value="desktop_click">Clicar na tela</option>
+                          <option value="desktop_double_click">Duplo clique</option><option value="desktop_drag">Arrastar mouse</option>
+                          <option value="desktop_type">Digitar no desktop</option><option value="desktop_press">Pressionar tecla desktop</option>
+                          <option value="desktop_hotkey">Atalho de teclado</option><option value="desktop_screenshot">Print da tela</option>
+                          <option value="desktop_wait">Esperar no desktop</option>
                         </select></div>
                         <div><label>URL</label><input name="url" /></div>
                         <div><label>Como localizar</label><select name="target_kind"><option value="text">Texto visivel</option><option value="label">Rotulo do campo</option><option value="role">Botao por nome</option><option value="css">Seletor CSS</option></select></div>
@@ -256,6 +261,12 @@
                         <div><label>Variaveis ambiente</label><input name="env" placeholder='JSON. Ex: {"AMBIENTE":"prod"}' /></div>
                         <div><label>Salvar saida como</label><input name="output_name" placeholder="saida-comando" /></div>
                         <div><label>Variavel destino</label><input name="variable" placeholder="conteudo_arquivo" /></div>
+                        <div><label>Mouse X</label><input name="x" type="number" placeholder="100" /></div>
+                        <div><label>Mouse Y</label><input name="y" type="number" placeholder="250" /></div>
+                        <div><label>Botao do mouse</label><select name="button"><option value="left">Esquerdo</option><option value="right">Direito</option><option value="middle">Meio</option></select></div>
+                        <div><label>Duracao movimento ms</label><input name="duration_ms" type="number" placeholder="300" /></div>
+                        <div><label>Intervalo digitacao ms</label><input name="interval_ms" type="number" placeholder="20" /></div>
+                        <div><label>Atalho</label><input name="keys" placeholder="ctrl+s ou alt+tab" /></div>
                         <label class="choice"><input name="overwrite" type="checkbox" value="true" /><span>Sobrescrever se ja existir</span></label>
                         <div><label>Credencial</label><input name="secret" placeholder="portal.password" /></div>
                         <div><label>Arquivo</label><input name="filename" /></div>
@@ -388,6 +399,11 @@
         file_write_text: "Criar arquivo texto",
         file_read_text: "Ler arquivo texto", file_zip: "Compactar ZIP",
         file_unzip: "Extrair ZIP", command_run: "Executar comando",
+        desktop_move: "Mover mouse", desktop_click: "Clicar na tela",
+        desktop_double_click: "Duplo clique", desktop_drag: "Arrastar mouse",
+        desktop_type: "Digitar no desktop", desktop_press: "Pressionar tecla desktop",
+        desktop_hotkey: "Atalho de teclado", desktop_screenshot: "Print da tela",
+        desktop_wait: "Esperar no desktop",
       };
 
       async function api(path, options = {}) {
@@ -437,15 +453,19 @@
         if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") throw new Error("Variaveis ambiente precisam ser um objeto JSON.");
         return parsed;
       }
+      function keysText(keys = []) { return Array.isArray(keys) ? keys.join("+") : ""; }
+      function parseKeys(value = "") { return value.split("+").map((item) => item.trim()).filter(Boolean); }
       function workflowFromSteps() {
         return {
           inputs: {},
           steps: visualSteps.map((step) => {
             const output = { type: step.type, timeout_ms: Number(step.timeout_ms || 30000) };
-            ["url", "value", "filename", "name", "path", "source", "destination", "command", "cwd", "output_name", "variable", "secret", "key"].forEach((field) => { if (step[field]) output[field] = step[field]; });
+            ["url", "value", "filename", "name", "path", "source", "destination", "command", "cwd", "output_name", "variable", "secret", "key", "button"].forEach((field) => { if (step[field]) output[field] = step[field]; });
+            ["x", "y", "duration_ms", "interval_ms"].forEach((field) => { if (step[field] !== undefined && step[field] !== null && step[field] !== "") output[field] = Number(step[field]); });
             if (step.target && Object.keys(step.target).length) output.target = step.target;
             if (step.args?.length) output.args = step.args;
             if (step.env && Object.keys(step.env).length) output.env = step.env;
+            if (step.keys?.length) output.keys = step.keys;
             if (step.overwrite) output.overwrite = true;
             return output;
           }),
@@ -462,8 +482,10 @@
           visualSteps[index][field] = parseArgs(value);
         } else if (field === "env") {
           visualSteps[index][field] = parseEnv(value);
+        } else if (field === "keys") {
+          visualSteps[index][field] = parseKeys(value);
         } else {
-          visualSteps[index][field] = field === "timeout_ms" ? Number(value) : value;
+          visualSteps[index][field] = ["timeout_ms", "x", "y", "duration_ms", "interval_ms"].includes(field) ? Number(value) : value;
         }
         syncJson();
       }
@@ -510,6 +532,12 @@
                 <div><label>Variaveis ambiente</label><input value="${esc(envText(step.env))}" onchange="updateStep(${index},'env',this.value)" /></div>
                 <div><label>Salvar saida como</label><input value="${esc(step.output_name)}" onchange="updateStep(${index},'output_name',this.value)" /></div>
                 <div><label>Variavel destino</label><input value="${esc(step.variable)}" onchange="updateStep(${index},'variable',this.value)" /></div>
+                <div><label>Mouse X</label><input type="number" value="${esc(step.x)}" onchange="updateStep(${index},'x',this.value)" /></div>
+                <div><label>Mouse Y</label><input type="number" value="${esc(step.y)}" onchange="updateStep(${index},'y',this.value)" /></div>
+                <div><label>Botao do mouse</label><select onchange="updateStep(${index},'button',this.value)"><option value="left" ${step.button === "left" ? "selected" : ""}>Esquerdo</option><option value="right" ${step.button === "right" ? "selected" : ""}>Direito</option><option value="middle" ${step.button === "middle" ? "selected" : ""}>Meio</option></select></div>
+                <div><label>Duracao movimento ms</label><input type="number" value="${esc(step.duration_ms)}" onchange="updateStep(${index},'duration_ms',this.value)" /></div>
+                <div><label>Intervalo digitacao ms</label><input type="number" value="${esc(step.interval_ms)}" onchange="updateStep(${index},'interval_ms',this.value)" /></div>
+                <div><label>Atalho</label><input value="${esc(keysText(step.keys))}" onchange="updateStep(${index},'keys',this.value)" /></div>
                 <label class="choice"><input type="checkbox" ${step.overwrite ? "checked" : ""} onchange="updateStep(${index},'overwrite',this.checked)" /><span>Sobrescrever se ja existir</span></label>
                 <div><label>Arquivo ou credencial</label><input value="${esc(step.filename || step.name || step.secret)}" onchange="updateStep(${index},'${step.type === "secret_fill" ? "secret" : step.type === "screenshot" ? "name" : "filename"}',this.value)" /></div>
               </div>
@@ -806,9 +834,11 @@
         const step = { type: data.type, timeout_ms: 30000 };
         if (data.url) step.url = data.url;
         if (data.target_value) step.target = targetFrom(data.target_kind, data.target_value);
-        ["value", "path", "source", "destination", "command", "cwd", "output_name", "variable", "secret", "filename", "key"].forEach((field) => { if (data[field]) step[field] = data[field]; });
+        ["value", "path", "source", "destination", "command", "cwd", "output_name", "variable", "secret", "filename", "key", "button"].forEach((field) => { if (data[field]) step[field] = data[field]; });
+        ["x", "y", "duration_ms", "interval_ms"].forEach((field) => { if (data[field]) step[field] = Number(data[field]); });
         if (data.args) step.args = parseArgs(data.args);
         if (data.env) step.env = parseEnv(data.env);
+        if (data.keys) step.keys = parseKeys(data.keys);
         if (data.overwrite === "true") step.overwrite = true;
         if (data.type === "screenshot" && data.filename) { step.name = data.filename; delete step.filename; }
         visualSteps.push(step);

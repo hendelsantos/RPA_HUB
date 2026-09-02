@@ -9,6 +9,7 @@ Aplicacao de automacao robotica de processos para criar, versionar, executar e m
 - Publicacao de versoes e criacao de novas versoes draft.
 - Execucao manual em background, com status, logs e artefatos.
 - Motor Playwright com blocos `goto`, `click`, `fill`, `secret_fill`, `select`, `press`, `wait_for`, `assert_text`, `download`, `screenshot` e `delay`.
+- Automacao local com mouse, teclado, arquivos, pastas, ZIP e comandos.
 - Cofre de credenciais local para referencias como `portal.password`.
 - Workers cadastraveis por maquina, tags e heartbeat.
 - Agendas persistidas em SQLite com formato cron.
@@ -209,6 +210,39 @@ Exemplo chamando um programa/script externo:
 ```
 
 Para comandos do terminal, prefira informar o programa e os argumentos separados. Exemplos: `["-c", "echo ok"]` com `bash`, ou `["/c", "dir"]` com `cmd`.
+
+## Automacao de mouse e teclado
+
+Para sistemas que nao tem API ou site facil de automatizar, o robo pode controlar a sessao grafica da maquina:
+
+- `desktop_move`: move o mouse para `x` e `y`.
+- `desktop_click`: clica na tela.
+- `desktop_double_click`: da duplo clique.
+- `desktop_drag`: arrasta o mouse.
+- `desktop_type`: digita texto.
+- `desktop_press`: pressiona uma tecla.
+- `desktop_hotkey`: executa atalhos como `ctrl+s` ou `alt+tab`.
+- `desktop_screenshot`: tira print da tela como evidencia.
+- `desktop_wait`: aguarda um tempo.
+
+Exemplo:
+
+```json
+{
+  "inputs": {},
+  "steps": [
+    { "type": "desktop_hotkey", "keys": ["win", "r"] },
+    { "type": "desktop_type", "value": "notepad", "interval_ms": 20 },
+    { "type": "desktop_press", "key": "enter" },
+    { "type": "desktop_wait", "timeout_ms": 1000 },
+    { "type": "desktop_type", "value": "Processo executado pelo HUB RPA" },
+    { "type": "desktop_hotkey", "keys": ["ctrl", "s"] },
+    { "type": "desktop_screenshot", "name": "notepad-aberto" }
+  ]
+}
+```
+
+Essa automacao controla o mouse e o teclado reais da maquina que executa o worker. No Linux, ela precisa de uma sessao grafica ativa; em servidores sem tela, use passos de arquivo/comando ou configure um desktop virtual.
 
 ## Agendas
 

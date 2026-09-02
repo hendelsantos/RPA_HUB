@@ -11,6 +11,7 @@ import zipfile
 
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError, sync_playwright
 
+from rpa_core.desktop import DesktopController
 from rpa_core.engine.models import Target, WorkflowDefinition
 from rpa_core.variables import normalize_url, render_template
 
@@ -18,6 +19,17 @@ from rpa_core.variables import normalize_url, render_template
 LogFn = Callable[[str, str, dict[str, Any] | None], None]
 SecretResolver = Callable[[str], str | None]
 WEB_STEPS = {"goto", "click", "fill", "secret_fill", "select", "press", "wait_for", "assert_text", "download", "screenshot"}
+DESKTOP_STEPS = {
+    "desktop_move",
+    "desktop_click",
+    "desktop_double_click",
+    "desktop_drag",
+    "desktop_type",
+    "desktop_press",
+    "desktop_hotkey",
+    "desktop_screenshot",
+    "desktop_wait",
+}
 
 
 class WorkflowExecutor:
@@ -25,6 +37,7 @@ class WorkflowExecutor:
         self.artifacts_dir = artifacts_dir
         self.headless = headless
         self.secret_resolver = secret_resolver
+        self._desktop: DesktopController | None = None
 
     def run(
         self,
@@ -217,6 +230,49 @@ class WorkflowExecutor:
             if result.returncode != 0:
                 raise RuntimeError(f"Comando falhou com codigo {result.returncode}: {result.stderr or result.stdout}")
 
+        elif step.type == "desktop_move":
+            desktop = self._desktop_controller()
+            x, y = self._coordinates(step)
+            desktop.move(x, y, step.duration_ms)
+
+        elif step.type == "desktop_click":
+            desktop = self._desktop_controller()
+            desktop.click(x=step.x, y=step.y, button=step.button, clicks=1)
+
+        elif step.type == "desktop_double_click":
+            desktop = self._desktop_controller()
+            desktop.click(x=step.x, y=step.y, button=step.button, clicks=2)
+
+        elif step.type == "desktop_drag":
+            desktop = self._desktop_controller()
+            x, y = self._coordinates(step)
+            desktop.drag(x, y, step.duration_ms or 300, step.button)
+
+        elif step.type == "desktop_type":
+            desktop = self._desktop_controller()
+            desktop.type_text(render_template(step.value, context) or "", step.interval_ms)
+
+        elif step.type == "desktop_press":
+            desktop = self._desktop_controller()
+            if not step.key:
+                raise ValueError("Etapa desktop_press requer key.")
+            desktop.press(step.key)
+
+        elif step.type == "desktop_hotkey":
+            desktop = self._desktop_controller()
+            desktop.hotkey([render_template(key, context) for key in step.keys])
+
+        elif step.type == "desktop_screenshot":
+            desktop = self._desktop_controller()
+            name = render_template(step.name, context) or f"desktop-{index}"
+            path = self.artifacts_dir / f"{name}.png"
+            desktop.screenshot(path)
+            artifacts.append(path)
+
+        elif step.type == "desktop_wait":
+            desktop = self._desktop_controller()
+            desktop.wait(step.timeout_ms)
+
         return artifacts
 
     def _require_page(self, page: Page | None, step_type: str) -> Page:
@@ -232,6 +288,16 @@ class WorkflowExecutor:
     def _ensure_can_write(self, path: Path, overwrite: bool) -> None:
         if path.exists() and not overwrite:
             raise FileExistsError(f"Caminho ja existe: {path}. Marque overwrite=true para substituir.")
+
+    def _desktop_controller(self) -> DesktopController:
+        if self._desktop is None:
+            self._desktop = DesktopController()
+        return self._desktop
+
+    def _coordinates(self, step) -> tuple[int, int]:
+        if step.x is None or step.y is None:
+            raise ValueError(f"Etapa {step.type} requer x e y.")
+        return step.x, step.y
 
     def _zip(self, source: Path, destination: Path) -> None:
         with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
