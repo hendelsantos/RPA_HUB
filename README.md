@@ -4,7 +4,7 @@ Aplicacao de automacao robotica de processos para criar, versionar, executar e m
 
 ## Modulos entregues
 
-- Dashboard operacional com robos, workers, agendas e execucoes.
+- Tela unica de Logs com indicadores, historico de execucoes, detalhes e artefatos.
 - Cadastro de robos com workflow JSON versionado.
 - Publicacao de versoes e criacao de novas versoes draft.
 - Execucao manual em background, com status, logs e artefatos.

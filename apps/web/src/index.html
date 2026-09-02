@@ -130,8 +130,7 @@
         <h1>HUB RPA</h1>
         <p>Crie, ensine e programe seus robos.</p>
         <button class="tab active" data-view="studio">Studio</button>
-        <button class="tab" data-view="dashboard">Dashboard</button>
-        <button class="tab" data-view="runs">Execucoes</button>
+        <button class="tab" data-view="logs">Logs</button>
         <button class="tab" data-view="secrets">Credenciais</button>
         <button class="tab" data-view="schedules">Agendas</button>
       </nav>
@@ -348,13 +347,9 @@
           </div>
         </section>
 
-        <section id="dashboard" class="view">
+        <section id="logs" class="view">
           <div class="metrics" id="metrics"></div>
-          <div class="panel"><h3>Execucoes recentes</h3><div class="table-wrap"><table class="table" id="recent-runs"></table></div></div>
-        </section>
-
-        <section id="runs" class="view">
-          <div class="panel"><h3>Historico de execucoes</h3><div class="table-wrap"><table class="table" id="runs-table"></table></div></div>
+          <div class="panel"><h3>Logs de execucao</h3><div class="table-wrap"><table class="table" id="runs-table"></table></div></div>
           <div class="panel" style="margin-top:14px"><h3>Detalhe</h3><pre id="run-detail">Selecione uma execucao.</pre></div>
         </section>
 
@@ -631,13 +626,18 @@
         await selectRobot(selectedRobot.id);
       }
       function renderRunsTable(selector, runs) {
-        document.querySelector(selector).innerHTML = `<tr><th>ID</th><th>Robo</th><th>Status</th><th>Inicio</th><th>Fim</th><th>Erro</th></tr>${runs.map((run) => `<tr onclick="showRun(${run.id})"><td>${run.id}</td><td>${run.robot_id}</td><td>${pill(run.status)}</td><td>${esc(run.started_at || "-")}</td><td>${esc(run.finished_at || "-")}</td><td>${esc(run.error || "-")}</td></tr>`).join("")}`;
+        document.querySelector(selector).innerHTML = `<tr><th>ID</th><th>Robo</th><th>Status</th><th>Inicio</th><th>Duracao</th><th>Logs</th><th>Artefatos</th><th>Erro</th></tr>${runs.map((run) => `<tr onclick="showRun(${run.id})"><td>${run.id}</td><td>${run.robot_id}</td><td>${pill(run.status)}</td><td>${esc(run.started_at || run.created_at || "-")}</td><td>${esc(runDuration(run))}</td><td>${run.logs?.length || 0}</td><td>${run.artifacts?.length || 0}</td><td>${esc(run.error || "-")}</td></tr>`).join("")}`;
       }
-      async function loadDashboard() {
+      function runDuration(run) {
+        if (!run.started_at || !run.finished_at) return "-";
+        const ms = new Date(run.finished_at) - new Date(run.started_at);
+        if (!Number.isFinite(ms) || ms < 0) return "-";
+        return `${Math.round(ms / 1000)}s`;
+      }
+      async function loadLogSummary() {
         const data = await api("/dashboard");
         const items = [["Robos", data.robots_total], ["Ativos", data.robots_active], ["Execucoes", data.runs_total], ["Sucesso", data.runs_success], ["Falhas", data.runs_failed], ["Agendas", data.schedules_enabled]];
         document.querySelector("#metrics").innerHTML = items.map(([label, value]) => `<div class="metric"><span>${label}</span><strong>${value}</strong></div>`).join("");
-        renderRunsTable("#recent-runs", data.recent_runs);
       }
       async function loadRuns() { renderRunsTable("#runs-table", await api("/runs")); }
       async function showRun(id) { document.querySelector("#run-detail").textContent = JSON.stringify(await api(`/runs/${id}`), null, 2); }
@@ -653,14 +653,14 @@
         document.querySelector("#schedules-table-full").innerHTML = html;
       }
       async function refreshAll() {
-        await Promise.all([loadDashboard(), loadRobots(), loadRuns(), loadSecrets(), loadSchedules()]);
+        await Promise.all([loadLogSummary(), loadRobots(), loadRuns(), loadSecrets(), loadSchedules()]);
         document.querySelector("#api-status").textContent = "API conectada";
       }
       async function runSelected(headless, messageSelector = "#robot-message") {
         if (!selectedRobot) return setMessage(messageSelector, "Selecione um robo.", "bad");
         try {
           const run = await api(`/robots/${selectedRobot.id}/run`, { method: "POST", body: JSON.stringify({ inputs: {}, headless }) });
-          setMessage(messageSelector, `Execucao ${run.id} iniciada. Acompanhe em Execucoes.`, "good");
+          setMessage(messageSelector, `Execucao ${run.id} iniciada. Acompanhe em Logs.`, "good");
           setTimeout(() => refreshAll().catch(() => {}), 1200);
         } catch (error) { setMessage(messageSelector, error.message, "bad"); }
       }
