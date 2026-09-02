@@ -83,6 +83,9 @@
       .step-number { background: #e7edf2; border-radius: 999px; color: var(--brand); display: inline-flex; font-size: 12px; font-weight: 800; justify-content: center; min-width: 30px; padding: 5px 7px; }
       .step-fields { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 10px; }
       .step-fields .wide { grid-column: 1 / -1; }
+      #step-form [data-step-field], .step [data-step-field] { display: none; }
+      #step-form [data-step-field].active, .step [data-step-field].active { display: block; }
+      #step-form label.choice[data-step-field].active, .step label.choice[data-step-field].active { display: flex; }
       .empty { align-items: center; border: 1px dashed #aeb9c6; border-radius: 8px; color: var(--muted); display: flex; justify-content: center; min-height: 170px; padding: 22px; text-align: center; }
       .choice-list { display: grid; gap: 8px; }
       .choice { align-items: center; border: 1px solid var(--line); border-radius: 7px; cursor: pointer; display: flex; gap: 10px; margin: 0; padding: 11px; }
@@ -229,47 +232,54 @@
                     <summary>Ferramentas avancadas</summary>
                     <form id="step-form">
                       <div class="step-fields">
-                        <div><label>Tipo do passo</label><select name="type">
-                          <option value="goto">Abrir site</option><option value="click">Clicar</option>
-                          <option value="fill">Preencher campo</option><option value="secret_fill">Preencher credencial</option>
-                          <option value="select">Selecionar opcao</option><option value="press">Pressionar tecla</option>
-                          <option value="wait_for">Esperar elemento</option><option value="assert_text">Validar texto</option>
-                          <option value="download">Baixar arquivo</option><option value="screenshot">Tirar evidencia</option>
-                          <option value="delay">Aguardar tempo</option>
-                          <option value="file_create_folder">Criar pasta</option><option value="file_copy">Copiar arquivo/pasta</option>
-                          <option value="file_move">Mover arquivo/pasta</option><option value="file_delete">Apagar arquivo/pasta</option>
-                          <option value="file_write_text">Criar arquivo texto</option>
-                          <option value="file_read_text">Ler arquivo texto</option><option value="file_zip">Compactar ZIP</option>
-                          <option value="file_unzip">Extrair ZIP</option><option value="command_run">Executar comando</option>
-                          <option value="desktop_move">Mover mouse</option><option value="desktop_click">Clicar na tela</option>
-                          <option value="desktop_double_click">Duplo clique</option><option value="desktop_drag">Arrastar mouse</option>
-                          <option value="desktop_type">Digitar no desktop</option><option value="desktop_press">Pressionar tecla desktop</option>
-                          <option value="desktop_hotkey">Atalho de teclado</option><option value="desktop_screenshot">Print da tela</option>
-                          <option value="desktop_wait">Esperar no desktop</option>
+                        <div><label>Tipo do passo</label><select name="type" id="step-type">
+                          <optgroup label="Navegador">
+                            <option value="goto">Abrir site</option><option value="click">Clicar</option>
+                            <option value="fill">Preencher campo</option><option value="secret_fill">Preencher credencial</option>
+                            <option value="select">Selecionar opcao</option><option value="press">Pressionar tecla</option>
+                            <option value="wait_for">Esperar elemento</option><option value="assert_text">Validar texto</option>
+                            <option value="download">Baixar arquivo</option><option value="screenshot">Tirar evidencia</option>
+                          </optgroup>
+                          <optgroup label="Arquivos e pastas">
+                            <option value="file_create_folder">Criar pasta</option><option value="file_copy">Copiar arquivo/pasta</option>
+                            <option value="file_move">Mover arquivo/pasta</option><option value="file_delete">Apagar arquivo/pasta</option>
+                            <option value="file_write_text">Criar arquivo texto</option><option value="file_read_text">Ler arquivo texto</option>
+                            <option value="file_zip">Compactar ZIP</option><option value="file_unzip">Extrair ZIP</option>
+                          </optgroup>
+                          <optgroup label="Comandos">
+                            <option value="command_run">Executar comando</option><option value="delay">Aguardar tempo</option>
+                          </optgroup>
+                          <optgroup label="Desktop">
+                            <option value="desktop_move">Mover mouse</option><option value="desktop_click">Clicar na tela</option>
+                            <option value="desktop_double_click">Duplo clique</option><option value="desktop_drag">Arrastar mouse</option>
+                            <option value="desktop_type">Digitar no desktop</option><option value="desktop_press">Pressionar tecla desktop</option>
+                            <option value="desktop_hotkey">Atalho de teclado</option><option value="desktop_screenshot">Print da tela</option>
+                            <option value="desktop_wait">Esperar no desktop</option>
+                          </optgroup>
                         </select></div>
-                        <div><label>URL</label><input name="url" /></div>
-                        <div><label>Como localizar</label><select name="target_kind"><option value="text">Texto visivel</option><option value="label">Rotulo do campo</option><option value="role">Botao por nome</option><option value="css">Seletor CSS</option></select></div>
-                        <div><label>Elemento</label><input name="target_value" /></div>
-                        <div><label>Valor</label><input name="value" /></div>
-                        <div><label>Caminho</label><input name="path" placeholder="C:\\Relatorios ou /home/usuario/relatorios" /></div>
-                        <div><label>Origem</label><input name="source" placeholder="Arquivo ou pasta de origem" /></div>
-                        <div><label>Destino</label><input name="destination" placeholder="Arquivo ou pasta de destino" /></div>
-                        <div><label>Comando</label><input name="command" placeholder="python, powershell, bash, libreoffice..." /></div>
-                        <div><label>Argumentos</label><input name="args" placeholder='Separados por |. Ex: script.py|--cliente|HMB' /></div>
-                        <div><label>Pasta de trabalho</label><input name="cwd" /></div>
-                        <div><label>Variaveis ambiente</label><input name="env" placeholder='JSON. Ex: {"AMBIENTE":"prod"}' /></div>
-                        <div><label>Salvar saida como</label><input name="output_name" placeholder="saida-comando" /></div>
-                        <div><label>Variavel destino</label><input name="variable" placeholder="conteudo_arquivo" /></div>
-                        <div><label>Mouse X</label><input name="x" type="number" placeholder="100" /></div>
-                        <div><label>Mouse Y</label><input name="y" type="number" placeholder="250" /></div>
-                        <div><label>Botao do mouse</label><select name="button"><option value="left">Esquerdo</option><option value="right">Direito</option><option value="middle">Meio</option></select></div>
-                        <div><label>Duracao movimento ms</label><input name="duration_ms" type="number" placeholder="300" /></div>
-                        <div><label>Intervalo digitacao ms</label><input name="interval_ms" type="number" placeholder="20" /></div>
-                        <div><label>Atalho</label><input name="keys" placeholder="ctrl+s ou alt+tab" /></div>
-                        <label class="choice"><input name="overwrite" type="checkbox" value="true" /><span>Sobrescrever se ja existir</span></label>
-                        <div><label>Credencial</label><input name="secret" placeholder="portal.password" /></div>
-                        <div><label>Arquivo</label><input name="filename" /></div>
-                        <div><label>Tecla</label><input name="key" /></div>
+                        <div data-step-field="url"><label>URL</label><input name="url" /></div>
+                        <div data-step-field="target"><label>Como localizar</label><select name="target_kind"><option value="text">Texto visivel</option><option value="label">Rotulo do campo</option><option value="role">Botao por nome</option><option value="css">Seletor CSS</option></select></div>
+                        <div data-step-field="target"><label>Elemento</label><input name="target_value" /></div>
+                        <div data-step-field="value"><label>Valor</label><input name="value" /></div>
+                        <div data-step-field="path"><label>Caminho</label><input name="path" placeholder="C:\\Relatorios ou /home/usuario/relatorios" /></div>
+                        <div data-step-field="source"><label>Origem</label><input name="source" placeholder="Arquivo ou pasta de origem" /></div>
+                        <div data-step-field="destination"><label>Destino</label><input name="destination" placeholder="Arquivo ou pasta de destino" /></div>
+                        <div data-step-field="command"><label>Comando</label><input name="command" placeholder="python, powershell, bash, libreoffice..." /></div>
+                        <div data-step-field="args"><label>Argumentos</label><input name="args" placeholder='Separados por |. Ex: script.py|--cliente|HMB' /></div>
+                        <div data-step-field="cwd"><label>Pasta de trabalho</label><input name="cwd" /></div>
+                        <div data-step-field="env"><label>Variaveis ambiente</label><input name="env" placeholder='JSON. Ex: {"AMBIENTE":"prod"}' /></div>
+                        <div data-step-field="output_name"><label>Salvar saida como</label><input name="output_name" placeholder="saida-comando" /></div>
+                        <div data-step-field="variable"><label>Variavel destino</label><input name="variable" placeholder="conteudo_arquivo" /></div>
+                        <div data-step-field="x"><label>Mouse X</label><input name="x" type="number" placeholder="100" /></div>
+                        <div data-step-field="y"><label>Mouse Y</label><input name="y" type="number" placeholder="250" /></div>
+                        <div data-step-field="button"><label>Botao do mouse</label><select name="button"><option value="left">Esquerdo</option><option value="right">Direito</option><option value="middle">Meio</option></select></div>
+                        <div data-step-field="duration_ms"><label>Duracao movimento ms</label><input name="duration_ms" type="number" placeholder="300" /></div>
+                        <div data-step-field="interval_ms"><label>Intervalo digitacao ms</label><input name="interval_ms" type="number" placeholder="20" /></div>
+                        <div data-step-field="keys"><label>Atalho</label><input name="keys" placeholder="ctrl+s ou alt+tab" /></div>
+                        <label class="choice" data-step-field="overwrite"><input name="overwrite" type="checkbox" value="true" /><span>Sobrescrever se ja existir</span></label>
+                        <div data-step-field="secret"><label>Credencial</label><input name="secret" placeholder="portal.password" /></div>
+                        <div data-step-field="filename"><label>Arquivo</label><input name="filename" /></div>
+                        <div data-step-field="key"><label>Tecla</label><input name="key" /></div>
                       </div>
                       <div class="toolbar"><button>Adicionar passo</button><button id="new-version" type="button" class="secondary">Criar nova versao</button></div>
                     </form>
@@ -400,6 +410,37 @@
         desktop_hotkey: "Atalho de teclado", desktop_screenshot: "Print da tela",
         desktop_wait: "Esperar no desktop",
       };
+      const stepFields = {
+        goto: ["url"],
+        click: ["target"],
+        fill: ["target", "value"],
+        secret_fill: ["target", "secret"],
+        select: ["target", "value"],
+        press: ["target", "key"],
+        wait_for: ["target"],
+        assert_text: ["target", "value"],
+        download: ["target", "filename"],
+        screenshot: ["filename"],
+        delay: [],
+        file_create_folder: ["path"],
+        file_copy: ["source", "destination", "overwrite"],
+        file_move: ["source", "destination", "overwrite"],
+        file_delete: ["path"],
+        file_write_text: ["path", "value", "overwrite"],
+        file_read_text: ["path", "variable"],
+        file_zip: ["source", "destination", "overwrite"],
+        file_unzip: ["source", "destination"],
+        command_run: ["command", "args", "cwd", "env", "output_name"],
+        desktop_move: ["x", "y", "duration_ms"],
+        desktop_click: ["x", "y", "button"],
+        desktop_double_click: ["x", "y", "button"],
+        desktop_drag: ["x", "y", "button", "duration_ms"],
+        desktop_type: ["value", "interval_ms"],
+        desktop_press: ["key"],
+        desktop_hotkey: ["keys"],
+        desktop_screenshot: ["filename"],
+        desktop_wait: [],
+      };
 
       async function api(path, options = {}) {
         const response = await fetch(path, { headers: { "Content-Type": "application/json", ...(options.headers || {}) }, ...options });
@@ -450,18 +491,34 @@
       }
       function keysText(keys = []) { return Array.isArray(keys) ? keys.join("+") : ""; }
       function parseKeys(value = "") { return value.split("+").map((item) => item.trim()).filter(Boolean); }
+      function visibleFieldsFor(type) {
+        return new Set(["type", "timeout_ms", ...(stepFields[type] || [])]);
+      }
+      function applyFieldVisibility(container, type) {
+        const visible = visibleFieldsFor(type);
+        container.querySelectorAll("[data-step-field]").forEach((field) => {
+          field.classList.toggle("active", visible.has(field.dataset.stepField));
+        });
+      }
+      function updateStepFormFields() {
+        const form = document.querySelector("#step-form");
+        if (!form) return;
+        applyFieldVisibility(form, form.elements.type.value);
+      }
       function workflowFromSteps() {
         return {
           inputs: {},
           steps: visualSteps.map((step) => {
+            const visible = visibleFieldsFor(step.type);
             const output = { type: step.type, timeout_ms: Number(step.timeout_ms || 30000) };
-            ["url", "value", "filename", "name", "path", "source", "destination", "command", "cwd", "output_name", "variable", "secret", "key", "button"].forEach((field) => { if (step[field]) output[field] = step[field]; });
-            ["x", "y", "duration_ms", "interval_ms"].forEach((field) => { if (step[field] !== undefined && step[field] !== null && step[field] !== "") output[field] = Number(step[field]); });
-            if (step.target && Object.keys(step.target).length) output.target = step.target;
-            if (step.args?.length) output.args = step.args;
-            if (step.env && Object.keys(step.env).length) output.env = step.env;
-            if (step.keys?.length) output.keys = step.keys;
-            if (step.overwrite) output.overwrite = true;
+            ["url", "value", "filename", "path", "source", "destination", "command", "cwd", "output_name", "variable", "secret", "key", "button"].forEach((field) => { if (visible.has(field) && step[field]) output[field] = step[field]; });
+            if (visible.has("filename") && step.name) output.name = step.name;
+            ["x", "y", "duration_ms", "interval_ms"].forEach((field) => { if (visible.has(field) && step[field] !== undefined && step[field] !== null && step[field] !== "") output[field] = Number(step[field]); });
+            if (visible.has("target") && step.target && Object.keys(step.target).length) output.target = step.target;
+            if (visible.has("args") && step.args?.length) output.args = step.args;
+            if (visible.has("env") && step.env && Object.keys(step.env).length) output.env = step.env;
+            if (visible.has("keys") && step.keys?.length) output.keys = step.keys;
+            if (visible.has("overwrite") && step.overwrite) output.overwrite = true;
             return output;
           }),
         };
@@ -481,6 +538,10 @@
           visualSteps[index][field] = parseKeys(value);
         } else {
           visualSteps[index][field] = ["timeout_ms", "x", "y", "duration_ms", "interval_ms"].includes(field) ? Number(value) : value;
+        }
+        if (field === "type") {
+          renderSteps();
+          return;
         }
         syncJson();
       }
@@ -513,31 +574,35 @@
               </div>
               <div class="step-fields">
                 <div><label>Tipo</label><select onchange="updateStep(${index},'type',this.value)">${Object.entries(labels).map(([value, label]) => `<option value="${value}" ${step.type === value ? "selected" : ""}>${label}</option>`).join("")}</select></div>
-                <div><label>Tempo de espera</label><input type="number" value="${Number(step.timeout_ms || 30000)}" onchange="updateStep(${index},'timeout_ms',this.value)" /></div>
-                <div class="wide"><label>URL</label><input value="${esc(step.url)}" onchange="updateStep(${index},'url',this.value)" /></div>
-                <div><label>Como localizar</label><select onchange="updateStep(${index},'target_kind',this.value)"><option value="text" ${kind === "text" ? "selected" : ""}>Texto</option><option value="label" ${kind === "label" ? "selected" : ""}>Rotulo</option><option value="role" ${kind === "role" ? "selected" : ""}>Botao</option><option value="css" ${kind === "css" ? "selected" : ""}>CSS</option></select></div>
-                <div><label>Elemento</label><input value="${esc(targetValue)}" onchange="updateStep(${index},'target_value',this.value)" /></div>
-                <div><label>Valor</label><input value="${esc(step.value)}" onchange="updateStep(${index},'value',this.value)" /></div>
-                <div><label>Caminho</label><input value="${esc(step.path)}" onchange="updateStep(${index},'path',this.value)" /></div>
-                <div><label>Origem</label><input value="${esc(step.source)}" onchange="updateStep(${index},'source',this.value)" /></div>
-                <div><label>Destino</label><input value="${esc(step.destination)}" onchange="updateStep(${index},'destination',this.value)" /></div>
-                <div><label>Comando</label><input value="${esc(step.command)}" onchange="updateStep(${index},'command',this.value)" /></div>
-                <div><label>Argumentos</label><input value="${esc(argsText(step.args))}" onchange="updateStep(${index},'args',this.value)" /></div>
-                <div><label>Pasta de trabalho</label><input value="${esc(step.cwd)}" onchange="updateStep(${index},'cwd',this.value)" /></div>
-                <div><label>Variaveis ambiente</label><input value="${esc(envText(step.env))}" onchange="updateStep(${index},'env',this.value)" /></div>
-                <div><label>Salvar saida como</label><input value="${esc(step.output_name)}" onchange="updateStep(${index},'output_name',this.value)" /></div>
-                <div><label>Variavel destino</label><input value="${esc(step.variable)}" onchange="updateStep(${index},'variable',this.value)" /></div>
-                <div><label>Mouse X</label><input type="number" value="${esc(step.x)}" onchange="updateStep(${index},'x',this.value)" /></div>
-                <div><label>Mouse Y</label><input type="number" value="${esc(step.y)}" onchange="updateStep(${index},'y',this.value)" /></div>
-                <div><label>Botao do mouse</label><select onchange="updateStep(${index},'button',this.value)"><option value="left" ${step.button === "left" ? "selected" : ""}>Esquerdo</option><option value="right" ${step.button === "right" ? "selected" : ""}>Direito</option><option value="middle" ${step.button === "middle" ? "selected" : ""}>Meio</option></select></div>
-                <div><label>Duracao movimento ms</label><input type="number" value="${esc(step.duration_ms)}" onchange="updateStep(${index},'duration_ms',this.value)" /></div>
-                <div><label>Intervalo digitacao ms</label><input type="number" value="${esc(step.interval_ms)}" onchange="updateStep(${index},'interval_ms',this.value)" /></div>
-                <div><label>Atalho</label><input value="${esc(keysText(step.keys))}" onchange="updateStep(${index},'keys',this.value)" /></div>
-                <label class="choice"><input type="checkbox" ${step.overwrite ? "checked" : ""} onchange="updateStep(${index},'overwrite',this.checked)" /><span>Sobrescrever se ja existir</span></label>
-                <div><label>Arquivo ou credencial</label><input value="${esc(step.filename || step.name || step.secret)}" onchange="updateStep(${index},'${step.type === "secret_fill" ? "secret" : step.type === "screenshot" ? "name" : "filename"}',this.value)" /></div>
+                <div data-step-field="timeout_ms"><label>Tempo de espera</label><input type="number" value="${Number(step.timeout_ms || 30000)}" onchange="updateStep(${index},'timeout_ms',this.value)" /></div>
+                <div class="wide" data-step-field="url"><label>URL</label><input value="${esc(step.url)}" onchange="updateStep(${index},'url',this.value)" /></div>
+                <div data-step-field="target"><label>Como localizar</label><select onchange="updateStep(${index},'target_kind',this.value)"><option value="text" ${kind === "text" ? "selected" : ""}>Texto</option><option value="label" ${kind === "label" ? "selected" : ""}>Rotulo</option><option value="role" ${kind === "role" ? "selected" : ""}>Botao</option><option value="css" ${kind === "css" ? "selected" : ""}>CSS</option></select></div>
+                <div data-step-field="target"><label>Elemento</label><input value="${esc(targetValue)}" onchange="updateStep(${index},'target_value',this.value)" /></div>
+                <div data-step-field="value"><label>Valor</label><input value="${esc(step.value)}" onchange="updateStep(${index},'value',this.value)" /></div>
+                <div data-step-field="path"><label>Caminho</label><input value="${esc(step.path)}" onchange="updateStep(${index},'path',this.value)" /></div>
+                <div data-step-field="source"><label>Origem</label><input value="${esc(step.source)}" onchange="updateStep(${index},'source',this.value)" /></div>
+                <div data-step-field="destination"><label>Destino</label><input value="${esc(step.destination)}" onchange="updateStep(${index},'destination',this.value)" /></div>
+                <div data-step-field="command"><label>Comando</label><input value="${esc(step.command)}" onchange="updateStep(${index},'command',this.value)" /></div>
+                <div data-step-field="args"><label>Argumentos</label><input value="${esc(argsText(step.args))}" onchange="updateStep(${index},'args',this.value)" /></div>
+                <div data-step-field="cwd"><label>Pasta de trabalho</label><input value="${esc(step.cwd)}" onchange="updateStep(${index},'cwd',this.value)" /></div>
+                <div data-step-field="env"><label>Variaveis ambiente</label><input value="${esc(envText(step.env))}" onchange="updateStep(${index},'env',this.value)" /></div>
+                <div data-step-field="output_name"><label>Salvar saida como</label><input value="${esc(step.output_name)}" onchange="updateStep(${index},'output_name',this.value)" /></div>
+                <div data-step-field="variable"><label>Variavel destino</label><input value="${esc(step.variable)}" onchange="updateStep(${index},'variable',this.value)" /></div>
+                <div data-step-field="x"><label>Mouse X</label><input type="number" value="${esc(step.x)}" onchange="updateStep(${index},'x',this.value)" /></div>
+                <div data-step-field="y"><label>Mouse Y</label><input type="number" value="${esc(step.y)}" onchange="updateStep(${index},'y',this.value)" /></div>
+                <div data-step-field="button"><label>Botao do mouse</label><select onchange="updateStep(${index},'button',this.value)"><option value="left" ${step.button === "left" ? "selected" : ""}>Esquerdo</option><option value="right" ${step.button === "right" ? "selected" : ""}>Direito</option><option value="middle" ${step.button === "middle" ? "selected" : ""}>Meio</option></select></div>
+                <div data-step-field="duration_ms"><label>Duracao movimento ms</label><input type="number" value="${esc(step.duration_ms)}" onchange="updateStep(${index},'duration_ms',this.value)" /></div>
+                <div data-step-field="interval_ms"><label>Intervalo digitacao ms</label><input type="number" value="${esc(step.interval_ms)}" onchange="updateStep(${index},'interval_ms',this.value)" /></div>
+                <div data-step-field="keys"><label>Atalho</label><input value="${esc(keysText(step.keys))}" onchange="updateStep(${index},'keys',this.value)" /></div>
+                <label class="choice" data-step-field="overwrite"><input type="checkbox" ${step.overwrite ? "checked" : ""} onchange="updateStep(${index},'overwrite',this.checked)" /><span>Sobrescrever se ja existir</span></label>
+                <div data-step-field="secret"><label>Credencial</label><input value="${esc(step.secret)}" onchange="updateStep(${index},'secret',this.value)" /></div>
+                <div data-step-field="filename"><label>Arquivo ou evidencia</label><input value="${esc(step.filename || step.name)}" onchange="updateStep(${index},'${["screenshot", "desktop_screenshot"].includes(step.type) ? "name" : "filename"}',this.value)" /></div>
               </div>
             </div>`;
         }).join("");
+        document.querySelectorAll("#steps .step").forEach((stepElement, index) => {
+          applyFieldVisibility(stepElement, visualSteps[index].type);
+        });
         syncJson();
       }
       function renderRobotLists() {
@@ -743,6 +808,7 @@
         document.querySelector("#custom-purpose-field").classList.toggle("hidden", !custom);
         document.querySelector('[name="custom_purpose"]').required = custom;
       }));
+      document.querySelector("#step-type").addEventListener("change", updateStepFormFields);
 
       document.querySelector("#project-form").addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -832,15 +898,19 @@
         event.preventDefault();
         const data = Object.fromEntries(new FormData(event.target).entries());
         const step = { type: data.type, timeout_ms: 30000 };
-        if (data.url) step.url = data.url;
-        if (data.target_value) step.target = targetFrom(data.target_kind, data.target_value);
-        ["value", "path", "source", "destination", "command", "cwd", "output_name", "variable", "secret", "filename", "key", "button"].forEach((field) => { if (data[field]) step[field] = data[field]; });
-        ["x", "y", "duration_ms", "interval_ms"].forEach((field) => { if (data[field]) step[field] = Number(data[field]); });
-        if (data.args) step.args = parseArgs(data.args);
-        if (data.env) step.env = parseEnv(data.env);
-        if (data.keys) step.keys = parseKeys(data.keys);
-        if (data.overwrite === "true") step.overwrite = true;
-        if (data.type === "screenshot" && data.filename) { step.name = data.filename; delete step.filename; }
+        const visible = visibleFieldsFor(data.type);
+        if (visible.has("url") && data.url) step.url = data.url;
+        if (visible.has("target") && data.target_value) step.target = targetFrom(data.target_kind, data.target_value);
+        ["value", "path", "source", "destination", "command", "cwd", "output_name", "variable", "secret", "key", "button"].forEach((field) => { if (visible.has(field) && data[field]) step[field] = data[field]; });
+        ["x", "y", "duration_ms", "interval_ms"].forEach((field) => { if (visible.has(field) && data[field]) step[field] = Number(data[field]); });
+        if (visible.has("args") && data.args) step.args = parseArgs(data.args);
+        if (visible.has("env") && data.env) step.env = parseEnv(data.env);
+        if (visible.has("keys") && data.keys) step.keys = parseKeys(data.keys);
+        if (visible.has("overwrite") && data.overwrite === "true") step.overwrite = true;
+        if (visible.has("filename") && data.filename) {
+          if (["screenshot", "desktop_screenshot"].includes(data.type)) step.name = data.filename;
+          else step.filename = data.filename;
+        }
         visualSteps.push(step);
         event.target.reset();
         renderSteps();
@@ -906,6 +976,7 @@
       });
 
       renderSteps();
+      updateStepFormFields();
       refreshAll().then(async () => {
         if (robots.length) await selectRobot(robots[0].id);
       }).catch((error) => { document.querySelector("#api-status").textContent = error.message; });

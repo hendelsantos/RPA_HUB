@@ -10,8 +10,8 @@ Problema atual: a tela de **Ferramentas avancadas** mostra muitos campos ao mesm
 
 Melhoria:
 
-- Mostrar somente os campos relevantes para o tipo de passo escolhido.
-- Separar os tipos em grupos: navegador, arquivo/pasta, comandos, desktop e evidencias.
+- Mostrar somente os campos relevantes para o tipo de passo escolhido. **Iniciado.**
+- Separar os tipos em grupos: navegador, arquivo/pasta, comandos, desktop e evidencias. **Iniciado.**
 - Validar campos antes de adicionar o passo.
 - Melhorar o resumo visual de cada passo.
 
