@@ -2,6 +2,23 @@
 
 Este documento organiza as proximas melhorias para transformar o HUB RPA em um produto mais profissional, facil de usar e forte para automacoes reais em Windows, Linux, navegador e desktop.
 
+## Prioridade atual
+
+A prioridade agora e executar a **Prioridade 2 - Automacao mais poderosa**.
+
+Motivo: o produto ja ganhou uma base visual melhor e agora precisa permitir automacoes reutilizaveis, com entradas variaveis, modelos e captura de desktop.
+
+Ordem recomendada para a proxima etapa:
+
+1. Finalizar **Variaveis amigaveis** antes da execucao.
+2. Criar **Biblioteca de modelos** para robos comuns.
+3. Evoluir o **Gravador de desktop**.
+4. Melhorar automacoes guiadas pelo navegador e pelo desktop.
+
+Credenciais avancadas ficam para depois. O produto tambem nao precisa de instalador Windows neste momento, porque a operacao sera feita pela interface web.
+
+Depois disso, faz sentido seguir para fila inteligente, permissoes e notificacoes.
+
 ## Prioridade 1 - Usabilidade principal
 
 ### 1. Construtor visual de passos
@@ -58,7 +75,6 @@ Melhoria:
 - Criar uma area unica do robo com:
   - dados gerais
   - passos
-  - credenciais vinculadas
   - versoes
   - agendas
   - ultima execucao
@@ -80,9 +96,9 @@ Melhoria:
 
 Melhoria:
 
-- Definir entradas do robo, como cliente, datas e pasta destino.
-- Pedir essas entradas antes de executar.
-- Usar essas variaveis em caminhos, textos, comandos e URLs.
+- Definir entradas do robo, como cliente, datas e pasta destino. **Iniciado.**
+- Pedir essas entradas antes de executar. **Iniciado.**
+- Usar essas variaveis em caminhos, textos, comandos e URLs. **Iniciado.**
 
 ### 7. Biblioteca de modelos
 
@@ -92,14 +108,6 @@ Melhoria:
 - Importar/exportar robos em JSON.
 - Duplicar robos existentes.
 
-### 8. Credenciais avancadas
-
-Melhoria:
-
-- Separar usuario, senha, token e certificado.
-- Mostrar quais robos usam cada credencial.
-- Permitir trocar credencial sem editar workflow.
-
 ## Prioridade 3 - Produto e operacao
 
 ### 9. Usuarios e permissoes
@@ -107,7 +115,7 @@ Melhoria:
 Melhoria:
 
 - Admin, operador e visualizador.
-- Proteger exclusao, credenciais e configuracoes.
+- Proteger exclusao e configuracoes criticas.
 
 ### 10. Fila inteligente
 
@@ -117,13 +125,13 @@ Melhoria:
 - Distribuir execucoes entre workers.
 - Mostrar maquina responsavel por cada execucao.
 
-### 11. Instalador e inicializacao
+### 11. Operacao web
 
 Melhoria:
 
-- Instalador Windows.
-- Atalho na area de trabalho.
-- Inicializacao automatica do worker.
+- Interface web unica para criar, configurar, executar e acompanhar robos.
+- Documentacao simples para iniciar o Hub em rede local.
+- Status claro do ambiente em uso.
 
 ### 12. Monitoramento e notificacoes
 
@@ -141,5 +149,5 @@ Melhoria:
 4. Variaveis amigaveis.
 5. Assistente de criacao com modelos.
 6. Fila inteligente para desktop.
-7. Credenciais avancadas.
-8. Instalador.
+7. Operacao web.
+8. Notificacoes.

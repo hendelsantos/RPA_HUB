@@ -106,6 +106,34 @@ Depois que um robo ja foi ensinado uma vez, ele pode ser usado quando voce quise
 
 Robos em `draft` ainda podem ser editados ou ensinados novamente. Robos `active` possuem uma versao publicada pronta para execucao.
 
+## Variaveis de execucao
+
+Em **Studio > Ensinar > Ferramentas avancadas**, use **Variaveis do robo** para criar entradas reutilizaveis, como:
+
+- `cliente`
+- `data_inicio`
+- `data_fim`
+- `pasta_destino`
+
+Depois use essas variaveis nos passos com `{{nome_da_variavel}}`.
+
+Exemplo:
+
+```json
+{
+  "inputs": {
+    "cliente": "HMB",
+    "pasta_destino": "C:\\RPA\\HMB"
+  },
+  "steps": [
+    { "type": "file_create_folder", "path": "{{pasta_destino}}" },
+    { "type": "file_write_text", "path": "{{pasta_destino}}\\cliente.txt", "value": "{{cliente}}", "overwrite": true }
+  ]
+}
+```
+
+Na etapa **3. Execucao**, o Hub mostra essas entradas para voce alterar antes de rodar ou salvar uma agenda.
+
 ## Gerenciar robos
 
 Na lista **Meus robos**:

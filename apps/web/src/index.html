@@ -230,6 +230,18 @@
                   <p class="message" id="robot-message"></p>
                   <details>
                     <summary>Ferramentas avancadas</summary>
+                    <div class="panel-title" style="margin-top:14px">
+                      <h3>Variaveis do robo</h3>
+                      <p>Defina entradas como cliente, data_inicio ou pasta_destino para usar nos passos com {{nome_da_variavel}}.</p>
+                    </div>
+                    <form id="input-form">
+                      <div class="step-fields">
+                        <div><label>Nome da variavel</label><input name="key" placeholder="cliente" /></div>
+                        <div><label>Valor padrao</label><input name="value" placeholder="HMB" /></div>
+                      </div>
+                      <div class="toolbar"><button>Adicionar variavel</button></div>
+                    </form>
+                    <div class="robot-list" id="input-list"></div>
                     <form id="step-form">
                       <div class="step-fields">
                         <div><label>Tipo do passo</label><select name="type" id="step-type">
@@ -339,6 +351,11 @@
                   </select>
                   <label>Nome desta programacao</label>
                   <input name="schedule_name" placeholder="Baixar vendas pela manha" />
+                  <div class="panel-title" style="margin-top:20px">
+                    <h3>Entradas desta execucao</h3>
+                    <p>Preencha os valores que este robo deve usar agora.</p>
+                  </div>
+                  <div id="run-inputs" class="step-fields"></div>
                   <div class="toolbar end">
                     <button>Salvar configuracao</button>
                     <button id="run-headless" type="button" class="secondary">Executar em segundo plano</button>
@@ -391,6 +408,7 @@
       let selectedRobot = null;
       let selectedVersion = null;
       let visualSteps = [];
+      let visualInputs = {};
       let activeRecording = null;
       let recordingTimer = null;
       const labels = {
@@ -491,6 +509,9 @@
       }
       function keysText(keys = []) { return Array.isArray(keys) ? keys.join("+") : ""; }
       function parseKeys(value = "") { return value.split("+").map((item) => item.trim()).filter(Boolean); }
+      function normalizeInputKey(value = "") {
+        return value.trim().replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_.-]/g, "");
+      }
       function visibleFieldsFor(type) {
         return new Set(["type", "timeout_ms", ...(stepFields[type] || [])]);
       }
@@ -507,7 +528,7 @@
       }
       function workflowFromSteps() {
         return {
-          inputs: {},
+          inputs: visualInputs,
           steps: visualSteps.map((step) => {
             const visible = visibleFieldsFor(step.type);
             const output = { type: step.type, timeout_ms: Number(step.timeout_ms || 30000) };
@@ -524,6 +545,38 @@
         };
       }
       function syncJson() { document.querySelector("#workflow").value = JSON.stringify(workflowFromSteps(), null, 2); }
+      function renderInputs() {
+        const inputList = document.querySelector("#input-list");
+        const runInputs = document.querySelector("#run-inputs");
+        const entries = Object.entries(visualInputs || {});
+        if (inputList) {
+          inputList.innerHTML = entries.length
+            ? entries.map(([key, value]) => `
+              <div class="robot-card">
+                <strong>{{${esc(key)}}}</strong>
+                <small>Valor padrao: ${esc(value)}</small>
+                <div class="robot-actions"><button class="danger tiny" onclick="removeInput('${esc(key)}')">Remover</button></div>
+              </div>`).join("")
+            : '<div class="empty">Nenhuma variavel definida.</div>';
+        }
+        if (runInputs) {
+          runInputs.innerHTML = entries.length
+            ? entries.map(([key, value]) => `<div><label>${esc(key)}</label><input name="${esc(key)}" value="${esc(value)}" /></div>`).join("")
+            : '<div class="empty">Este robo nao possui entradas configuradas.</div>';
+        }
+        syncJson();
+      }
+      function removeInput(key) {
+        delete visualInputs[key];
+        renderInputs();
+      }
+      function collectRunInputs() {
+        const form = document.querySelector("#run-inputs");
+        const inputs = {};
+        if (!form) return inputs;
+        form.querySelectorAll("input[name]").forEach((input) => { inputs[input.name] = input.value; });
+        return inputs;
+      }
       function updateStep(index, field, value) {
         if (field === "target_kind" || field === "target_value") {
           const [kind, currentValue] = targetParts(visualSteps[index].target);
@@ -558,6 +611,7 @@
         if (!visualSteps.length) {
           container.innerHTML = '<div class="empty">Ainda nao ha passos. Use Iniciar ensino para navegador ou Ferramentas avancadas para arquivos, pastas e comandos locais.</div>';
           syncJson();
+          renderInputs();
           return;
         }
         container.innerHTML = visualSteps.map((step, index) => {
@@ -604,6 +658,7 @@
           applyFieldVisibility(stepElement, visualSteps[index].type);
         });
         syncJson();
+        renderInputs();
       }
       function renderRobotLists() {
         const content = robots.length
@@ -664,6 +719,7 @@
         if (!selectedRobot) return;
         selectedVersion = await api(`/robots/${id}/versions/latest`);
         await loadRobotSecrets();
+        visualInputs = { ...(selectedVersion.workflow.inputs || {}) };
         visualSteps = (selectedVersion.workflow.steps || []).map((step) => ({ timeout_ms: 30000, ...step }));
         document.querySelector("#teach-title").textContent = selectedRobot.name;
         document.querySelector("#teach-meta").innerHTML = `${pill(selectedRobot.status)} ${pill(selectedVersion.status)} versao ${selectedVersion.version} · ${esc(selectedRobot.description)}`;
@@ -671,6 +727,7 @@
         document.querySelector("#record-url").value = selectedRobot.start_url || "";
         setMessage("#robot-message", "");
         renderSteps();
+        renderInputs();
         renderRobotLists();
       }
       async function saveWorkflow() {
@@ -724,7 +781,7 @@
       async function runSelected(headless, messageSelector = "#robot-message") {
         if (!selectedRobot) return setMessage(messageSelector, "Selecione um robo.", "bad");
         try {
-          const run = await api(`/robots/${selectedRobot.id}/run`, { method: "POST", body: JSON.stringify({ inputs: {}, headless }) });
+          const run = await api(`/robots/${selectedRobot.id}/run`, { method: "POST", body: JSON.stringify({ inputs: collectRunInputs(), headless }) });
           setMessage(messageSelector, `Execucao ${run.id} iniciada. Acompanhe em Logs.`, "good");
           setTimeout(() => refreshAll().catch(() => {}), 1200);
         } catch (error) { setMessage(messageSelector, error.message, "bad"); }
@@ -771,8 +828,10 @@
             selectedRobot = null;
             selectedVersion = null;
             visualSteps = [];
+            visualInputs = {};
             robotSecrets = [];
             renderSteps();
+            renderInputs();
             renderRobotSecrets();
           }
           await refreshAll();
@@ -809,6 +868,16 @@
         document.querySelector('[name="custom_purpose"]').required = custom;
       }));
       document.querySelector("#step-type").addEventListener("change", updateStepFormFields);
+      document.querySelector("#input-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const data = Object.fromEntries(new FormData(event.target).entries());
+        const key = normalizeInputKey(data.key);
+        if (!key) return setMessage("#robot-message", "Informe um nome valido para a variavel.", "bad");
+        visualInputs[key] = data.value || "";
+        event.target.reset();
+        renderInputs();
+        setMessage("#robot-message", `Variavel {{${key}}} adicionada.`, "good");
+      });
 
       document.querySelector("#project-form").addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -918,8 +987,10 @@
       document.querySelector("#apply-json").addEventListener("click", () => {
         try {
           const workflow = JSON.parse(document.querySelector("#workflow").value);
+          visualInputs = { ...(workflow.inputs || {}) };
           visualSteps = (workflow.steps || []).map((step) => ({ timeout_ms: 30000, ...step }));
           renderSteps();
+          renderInputs();
           setMessage("#robot-message", "JSON aplicado aos passos.", "good");
         } catch (error) { setMessage("#robot-message", error.message, "bad"); }
       });
@@ -948,7 +1019,7 @@
           const [hour, minute] = (data.time || "08:00").split(":");
           const cron = data.mode === "daily" ? `${minute} ${hour} * * *` : data.mode === "business_days" ? `${minute} ${hour} * * 1-5` : "0 * * * *";
           const name = data.schedule_name.trim() || `${selectedRobot.name} - ${data.mode}`;
-          await api("/schedules", { method: "POST", body: JSON.stringify({ robot_id: selectedRobot.id, name, cron, inputs: {}, enabled: true }) });
+          await api("/schedules", { method: "POST", body: JSON.stringify({ robot_id: selectedRobot.id, name, cron, inputs: collectRunInputs(), enabled: true }) });
           await loadSchedules();
           setMessage("#execution-message", "Programacao salva e ativada.", "good");
         } catch (error) { setMessage("#execution-message", error.message, "bad"); }

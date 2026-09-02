@@ -28,6 +28,20 @@ def test_file_system_workflow_without_browser(tmp_path):
     assert destination.read_text(encoding="utf-8") == "relatorio pronto"
 
 
+def test_run_inputs_override_workflow_defaults(tmp_path):
+    output = tmp_path / "cliente.txt"
+    workflow = {
+        "inputs": {"cliente": "padrao"},
+        "steps": [
+            {"type": "file_write_text", "path": str(output), "value": "{{cliente}}", "overwrite": True},
+        ],
+    }
+
+    WorkflowExecutor(tmp_path / "artifacts", headless=True).run(workflow, inputs={"cliente": "HMB"})
+
+    assert output.read_text(encoding="utf-8") == "HMB"
+
+
 def test_file_system_workflow_validation_requires_paths():
     workflow = {
         "inputs": {},
