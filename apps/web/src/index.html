@@ -132,7 +132,7 @@
         <button class="tab active" data-view="studio">Studio</button>
         <button class="tab" data-view="dashboard">Dashboard</button>
         <button class="tab" data-view="runs">Execucoes</button>
-        <button class="tab" data-view="secrets">Segredos</button>
+        <button class="tab" data-view="secrets">Credenciais</button>
         <button class="tab" data-view="schedules">Agendas</button>
       </nav>
 
@@ -232,7 +232,7 @@
                       <div class="step-fields">
                         <div><label>Tipo do passo</label><select name="type">
                           <option value="goto">Abrir site</option><option value="click">Clicar</option>
-                          <option value="fill">Preencher campo</option><option value="secret_fill">Preencher segredo</option>
+                          <option value="fill">Preencher campo</option><option value="secret_fill">Preencher credencial</option>
                           <option value="select">Selecionar opcao</option><option value="press">Pressionar tecla</option>
                           <option value="wait_for">Esperar elemento</option><option value="assert_text">Validar texto</option>
                           <option value="download">Baixar arquivo</option><option value="screenshot">Tirar evidencia</option>
@@ -257,7 +257,7 @@
                         <div><label>Salvar saida como</label><input name="output_name" placeholder="saida-comando" /></div>
                         <div><label>Variavel destino</label><input name="variable" placeholder="conteudo_arquivo" /></div>
                         <label class="choice"><input name="overwrite" type="checkbox" value="true" /><span>Sobrescrever se ja existir</span></label>
-                        <div><label>Segredo</label><input name="secret" placeholder="portal.password" /></div>
+                        <div><label>Credencial</label><input name="secret" placeholder="portal.password" /></div>
                         <div><label>Arquivo</label><input name="filename" /></div>
                         <div><label>Tecla</label><input name="key" /></div>
                       </div>
@@ -277,10 +277,10 @@
                 <div class="robot-list" id="teach-robot-list"></div>
                 <div class="panel-title" style="margin-top:20px">
                   <h3>Credenciais deste robo</h3>
-                  <p>Vincule segredos ja cadastrados para usar em passos de login.</p>
+                  <p>Vincule credenciais ja cadastradas para usar em passos de login.</p>
                 </div>
                 <form id="robot-secret-form">
-                  <label>Segredo salvo</label>
+                  <label>Credencial salva</label>
                   <select name="secret_id" id="robot-secret-select"></select>
                   <label>Apelido opcional</label>
                   <input name="alias" placeholder="Senha do portal" />
@@ -350,15 +350,15 @@
         <section id="secrets" class="view">
           <div class="layout-left">
             <div class="panel">
-              <h3>Novo segredo</h3>
+              <h3>Nova credencial</h3>
               <form id="secret-form">
                 <label>Nome</label><input name="name" required placeholder="portal.password" />
                 <label>Senha ou token</label><input name="value" required type="password" />
                 <label>Descricao</label><input name="description" />
-                <div class="toolbar end"><button>Salvar segredo</button></div>
+                <div class="toolbar end"><button>Salvar credencial</button></div>
               </form>
             </div>
-            <div class="panel"><h3>Segredos cadastrados</h3><div class="table-wrap"><table class="table" id="secrets-table"></table></div></div>
+            <div class="panel"><h3>Credenciais cadastradas</h3><div class="table-wrap"><table class="table" id="secrets-table"></table></div></div>
           </div>
         </section>
 
@@ -379,7 +379,7 @@
       let recordingTimer = null;
       const labels = {
         goto: "Abrir site", click: "Clicar", fill: "Preencher campo",
-        secret_fill: "Preencher segredo", select: "Selecionar opcao",
+        secret_fill: "Preencher credencial", select: "Selecionar opcao",
         press: "Pressionar tecla", wait_for: "Esperar aparecer",
         assert_text: "Validar texto", download: "Baixar arquivo",
         screenshot: "Tirar evidencia", delay: "Aguardar tempo",
@@ -511,7 +511,7 @@
                 <div><label>Salvar saida como</label><input value="${esc(step.output_name)}" onchange="updateStep(${index},'output_name',this.value)" /></div>
                 <div><label>Variavel destino</label><input value="${esc(step.variable)}" onchange="updateStep(${index},'variable',this.value)" /></div>
                 <label class="choice"><input type="checkbox" ${step.overwrite ? "checked" : ""} onchange="updateStep(${index},'overwrite',this.checked)" /><span>Sobrescrever se ja existir</span></label>
-                <div><label>Arquivo ou segredo</label><input value="${esc(step.filename || step.name || step.secret)}" onchange="updateStep(${index},'${step.type === "secret_fill" ? "secret" : step.type === "screenshot" ? "name" : "filename"}',this.value)" /></div>
+                <div><label>Arquivo ou credencial</label><input value="${esc(step.filename || step.name || step.secret)}" onchange="updateStep(${index},'${step.type === "secret_fill" ? "secret" : step.type === "screenshot" ? "name" : "filename"}',this.value)" /></div>
               </div>
             </div>`;
         }).join("");
@@ -538,7 +538,7 @@
         if (!select) return;
         select.innerHTML = secrets.length
           ? secrets.map((secret) => `<option value="${secret.id}">${esc(secret.name)}</option>`).join("")
-          : '<option value="">Cadastre um segredo primeiro</option>';
+          : '<option value="">Cadastre uma credencial primeiro</option>';
       }
       function renderRobotSecrets() {
         const container = document.querySelector("#robot-secret-list");
@@ -661,7 +661,7 @@
         if (!linkedSecret) return;
         const secretInput = document.querySelector('#step-form [name="secret"]');
         if (secretInput) secretInput.value = linkedSecret.secret_name;
-        setMessage("#robot-message", `Segredo ${linkedSecret.secret_name} pronto para usar no proximo passo.`, "good");
+        setMessage("#robot-message", `Credencial ${linkedSecret.secret_name} pronto para usar no proximo passo.`, "good");
       }
       async function detachRobotSecret(event, linkId) {
         event.stopPropagation();
@@ -835,7 +835,7 @@
         event.preventDefault();
         if (!selectedRobot) return setMessage("#robot-message", "Selecione um robo.", "bad");
         const data = Object.fromEntries(new FormData(event.target).entries());
-        if (!data.secret_id) return setMessage("#robot-message", "Cadastre um segredo primeiro.", "bad");
+        if (!data.secret_id) return setMessage("#robot-message", "Cadastre uma credencial primeiro.", "bad");
         try {
           await api(`/robots/${selectedRobot.id}/secrets`, { method: "POST", body: JSON.stringify({ secret_id: Number(data.secret_id), alias: data.alias || "" }) });
           event.target.reset();

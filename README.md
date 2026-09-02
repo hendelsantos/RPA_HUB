@@ -9,10 +9,10 @@ Aplicacao de automacao robotica de processos para criar, versionar, executar e m
 - Publicacao de versoes e criacao de novas versoes draft.
 - Execucao manual em background, com status, logs e artefatos.
 - Motor Playwright com blocos `goto`, `click`, `fill`, `secret_fill`, `select`, `press`, `wait_for`, `assert_text`, `download`, `screenshot` e `delay`.
-- Cofre de segredos local para referencias como `portal.password`.
+- Cofre de credenciais local para referencias como `portal.password`.
 - Workers cadastraveis por maquina, tags e heartbeat.
 - Agendas persistidas em SQLite com formato cron.
-- Auditoria de criacao, publicacao, execucao, segredo, worker e agenda.
+- Auditoria de criacao, publicacao, execucao, credencial, worker e agenda.
 - Inicio do Modo Ensinar por gravacao assistida de navegador.
 
 ## Instalar
@@ -121,11 +121,11 @@ Robos em `draft` ainda podem ser editados ou ensinados novamente. Robos `active`
 }
 ```
 
-## Exemplo com segredo
+## Exemplo com credencial
 
-Crie um segredo chamado `portal.password` na tela **Segredos**. Depois selecione o robo em **Studio** e vincule esse segredo em **Credenciais deste robo**.
+Crie uma credencial chamada `portal.password` na tela **Credenciais**. Depois selecione o robo em **Studio** e vincule essa credencial em **Credenciais deste robo**.
 
-No passo de login, use `secret_fill` referenciando o nome do segredo:
+No passo de login, use `secret_fill` referenciando o nome da credencial:
 
 ```json
 {
@@ -139,7 +139,7 @@ No passo de login, use `secret_fill` referenciando o nome do segredo:
 }
 ```
 
-O valor da senha nao aparece no workflow, nos logs ou na tela. O robo guarda somente o nome do segredo, por exemplo `portal.password`, e o Hub busca o valor real apenas na hora da execucao.
+O valor da senha nao aparece no workflow, nos logs ou na tela. O robo guarda somente o nome da credencial, por exemplo `portal.password`, e o Hub busca o valor real apenas na hora da execucao.
 
 ## Automacao do sistema operacional
 
