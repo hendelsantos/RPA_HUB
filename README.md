@@ -94,6 +94,17 @@ python apps/worker/local_worker.py --hub http://127.0.0.1:8010 --name AUTO-01 --
 
 Para aprender o fluxo sem cadastrar um site, use **Criar teste pronto** na primeira etapa. O JSON fica disponivel somente em **Ferramentas avancadas**.
 
+## Executar um robo treinado depois
+
+Depois que um robo ja foi ensinado uma vez, ele pode ser usado quando voce quiser:
+
+1. Abra o Hub.
+2. Em **Studio**, escolha o robo na lista **Meus robos**.
+3. Clique em **Ativar** para aprovar o ultimo ensino valido.
+4. Depois disso, clique em **Executar** sempre que quiser rodar o robo em segundo plano.
+
+Robos em `draft` ainda podem ser editados ou ensinados novamente. Robos `active` possuem uma versao publicada pronta para execucao.
+
 ## Exemplo interno de workflow
 
 ```json

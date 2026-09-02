@@ -24,9 +24,9 @@ class RunService:
         return list(self.session.scalars(stmt))
 
     def create_run(self, robot_id: int, inputs: dict[str, Any]) -> Run:
-        version = RobotRepository(self.session).latest_version(robot_id)
+        version = RobotRepository(self.session).latest_published_version(robot_id)
         if version is None:
-            raise ValueError("Versao nao encontrada.")
+            raise ValueError("Robo sem versao ativa. Ative um ensino antes de executar.")
         run = Run(robot_id=robot_id, robot_version_id=version.id, status="QUEUED", inputs=inputs)
         self.session.add(run)
         self.session.flush()

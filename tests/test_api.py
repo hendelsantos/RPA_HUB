@@ -102,6 +102,27 @@ def test_publish_requires_valid_workflow():
         assert publish.status_code == 400
 
 
+def test_activate_robot_publishes_latest_valid_training():
+    workflow = {
+        "inputs": {},
+        "steps": [
+            {"type": "goto", "url": "https://example.com"},
+            {"type": "screenshot", "name": "ativado"},
+        ],
+    }
+
+    with TestClient(app) as client:
+        robot = client.post("/robots", json={"name": "Robo para ativar", "start_url": "https://example.com"}).json()
+        version = client.post(f"/robots/{robot['id']}/versions", json={"workflow": workflow}).json()
+
+        activate = client.post(f"/robots/{robot['id']}/activate")
+
+        assert activate.status_code == 200
+        assert activate.json()["id"] == version["id"]
+        assert activate.json()["status"] == "published"
+        assert client.get(f"/robots/{robot['id']}").json()["status"] == "active"
+
+
 def test_run_executes_the_version_that_was_queued(monkeypatch, tmp_path):
     captured_workflows = []
 
@@ -127,10 +148,10 @@ def test_run_executes_the_version_that_was_queued(monkeypatch, tmp_path):
             session.commit()
 
             service = RunService(session, tmp_path, tmp_path / "artifacts")
-            run = service.create_run(robot.id, {})
+            repo.create_next_version(robot.id, {"inputs": {}, "steps": [{"type": "screenshot", "name": "v2"}]})
             session.commit()
 
-            repo.create_next_version(robot.id, {"inputs": {}, "steps": [{"type": "screenshot", "name": "v2"}]})
+            run = service.create_run(robot.id, {})
             session.commit()
 
             service.execute_run(run.id, headless=True)

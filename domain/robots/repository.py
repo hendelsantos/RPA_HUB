@@ -75,6 +75,15 @@ class RobotRepository:
         )
         return self.session.scalar(stmt)
 
+    def latest_published_version(self, robot_id: int) -> RobotVersion | None:
+        stmt = (
+            select(RobotVersion)
+            .where(RobotVersion.robot_id == robot_id, RobotVersion.status == "published")
+            .order_by(desc(RobotVersion.version))
+            .limit(1)
+        )
+        return self.session.scalar(stmt)
+
     def update_workflow(self, version_id: int, workflow: dict[str, Any]) -> RobotVersion | None:
         version = self.session.get(RobotVersion, version_id)
         if not version:

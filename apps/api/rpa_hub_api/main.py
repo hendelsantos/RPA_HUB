@@ -227,13 +227,34 @@ def publish_version(version_id: int, session: Session = Depends(get_session)):
     return version
 
 
+@app.post("/robots/{robot_id}/activate", response_model=VersionOut)
+def activate_robot(robot_id: int, session: Session = Depends(get_session)):
+    repo = RobotRepository(session)
+    robot = repo.get_robot(robot_id)
+    if not robot:
+        raise HTTPException(status_code=404, detail="Robo nao encontrado.")
+    existing = repo.latest_version(robot_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Versao nao encontrada.")
+    errors = validate_workflow(existing.workflow)
+    if errors:
+        raise HTTPException(status_code=400, detail={"message": "Este robo ainda nao tem um ensino valido para ativar.", "errors": errors})
+    version = repo.publish_version(existing.id)
+    if not version:
+        raise HTTPException(status_code=404, detail="Versao nao encontrada.")
+    audit(session, "robot.activated", "robot", robot.id, {"version_id": version.id, "version": version.version})
+    session.commit()
+    return version
+
+
 @app.post("/robots/{robot_id}/run", response_model=RunOut)
 def run_robot(robot_id: int, payload: RunCreate, background_tasks: BackgroundTasks, session: Session = Depends(get_session)):
     service = RunService(session, BASE_DIR, ARTIFACTS_DIR)
     try:
         run = service.create_run(robot_id, payload.inputs)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        status_code = 400 if "sem versao ativa" in str(exc) else 404
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     audit(session, "run.queued", "run", run.id, {"robot_id": robot_id})
     session.commit()
     background_tasks.add_task(_execute_run_background, run.id, payload.headless)
