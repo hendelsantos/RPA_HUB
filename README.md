@@ -26,6 +26,38 @@ playwright install chromium
 
 ## Rodar o hub
 
+Linux:
+
+```bash
+./start-linux.sh
+```
+
+Windows:
+
+```bat
+start-windows.bat
+```
+
+Os scripts criam o ambiente virtual `.venv`, instalam as dependencias, garantem o Chromium do Playwright e iniciam o Hub em `http://127.0.0.1:8010`.
+
+Para trocar host ou porta:
+
+Linux:
+
+```bash
+APP_HOST=0.0.0.0 APP_PORT=8020 ./start-linux.sh
+```
+
+Windows:
+
+```bat
+set APP_HOST=0.0.0.0
+set APP_PORT=8020
+start-windows.bat
+```
+
+Comando manual equivalente:
+
 ```bash
 uvicorn apps.api.rpa_hub_api.main:app --reload --host 127.0.0.1 --port 8010
 ```
