@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HUB RPA</title>
+    <style>
+      :root {
+        --bg: #f4f6f8;
+        --surface: #ffffff;
+        --ink: #17202a;
+        --muted: #667085;
+        --line: #d9e0e8;
+        --brand: #146c63;
+        --brand-dark: #0d4f49;
+        --warn: #b54708;
+        --bad: #b42318;
+        --good: #147a43;
+        --nav: #111827;
+        --soft: #eef3f7;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .shell { display: grid; grid-template-columns: 260px minmax(0, 1fr); min-height: 100vh; }
+      nav { background: var(--nav); color: #fff; padding: 20px 16px; }
+      nav h1 { font-size: 22px; margin: 0 0 4px; }
+      nav p { color: #bcc6d3; font-size: 13px; margin: 0 0 24px; }
+      .tab { background: transparent; border: 0; border-radius: 6px; color: #d7dee8; cursor: pointer; display: block; font: inherit; margin-bottom: 6px; min-height: 40px; padding: 10px 12px; text-align: left; width: 100%; }
+      .tab.active, .tab:hover { background: #233142; color: #fff; }
+      main { padding: 22px; }
+      .topbar { align-items: center; display: flex; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+      .topbar h2 { font-size: 22px; margin: 0; }
+      .status { color: var(--muted); font-size: 13px; }
+      .view { display: none; }
+      .view.active { display: block; }
+      .metrics { display: grid; gap: 12px; grid-template-columns: repeat(6, minmax(120px, 1fr)); margin-bottom: 18px; }
+      .metric, .panel, .item, .step { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+      .metric { padding: 14px; }
+      .metric span { color: var(--muted); display: block; font-size: 12px; }
+      .metric strong { display: block; font-size: 24px; margin-top: 6px; }
+      .grid { display: grid; gap: 14px; grid-template-columns: 360px minmax(0, 1fr); }
+      .panel { padding: 16px; min-width: 0; }
+      .panel h3 { font-size: 15px; margin: 0 0 12px; }
+      label { color: var(--muted); display: block; font-size: 12px; margin: 10px 0 5px; }
+      input, textarea, select { border: 1px solid var(--line); border-radius: 6px; color: var(--ink); font: inherit; min-height: 38px; padding: 9px 10px; width: 100%; }
+      textarea { font-family: "SFMono-Regular", Consolas, monospace; min-height: 140px; resize: vertical; }
+      button { background: var(--brand); border: 0; border-radius: 6px; color: #fff; cursor: pointer; font: inherit; font-weight: 700; min-height: 38px; padding: 9px 12px; }
+      button:hover { background: var(--brand-dark); }
+      button.secondary { background: #e8edf2; color: var(--ink); }
+      button.secondary:hover { background: #dbe3eb; }
+      button.danger { background: #fee4e2; color: var(--bad); }
+      button.danger:hover { background: #fecdca; }
+      button.tiny { font-size: 12px; min-height: 28px; padding: 5px 8px; }
+      .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+      .list, .steps { display: grid; gap: 8px; }
+      .item { cursor: pointer; padding: 12px; }
+      .item:hover, .item.active { border-color: var(--brand); box-shadow: inset 3px 0 0 var(--brand); }
+      .item strong { display: block; font-size: 14px; }
+      .item small { color: var(--muted); display: block; font-size: 12px; margin-top: 3px; }
+      .builder { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr) 310px; margin-top: 14px; }
+      .step { padding: 12px; }
+      .step-head { align-items: center; display: flex; gap: 10px; justify-content: space-between; margin-bottom: 10px; }
+      .step-title { align-items: center; display: flex; gap: 8px; min-width: 0; }
+      .step-number { background: var(--soft); border-radius: 999px; color: var(--brand); display: inline-flex; font-size: 12px; font-weight: 800; justify-content: center; min-width: 30px; padding: 5px 8px; }
+      .step-title strong { font-size: 14px; }
+      .step-fields { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .step-fields .wide { grid-column: 1 / -1; }
+      .empty { align-items: center; background: #fbfcfd; border: 1px dashed #b8c4d2; border-radius: 8px; color: var(--muted); display: flex; justify-content: center; min-height: 180px; padding: 18px; text-align: center; }
+      .table { border-collapse: collapse; width: 100%; }
+      .table th, .table td { border-bottom: 1px solid var(--line); font-size: 13px; padding: 10px; text-align: left; vertical-align: top; }
+      .pill { border-radius: 999px; display: inline-block; font-size: 12px; font-weight: 700; padding: 4px 8px; }
+      .SUCCESS, .online, .active, .published { background: #dcfce7; color: var(--good); }
+      .FAILED, .offline { background: #fee4e2; color: var(--bad); }
+      .RUNNING, .QUEUED, .draft { background: #fff3d6; color: var(--warn); }
+      details { background: #fbfcfd; border: 1px solid var(--line); border-radius: 8px; margin-top: 14px; padding: 10px; }
+      summary { cursor: pointer; font-weight: 700; }
+      pre { background: #101820; border-radius: 8px; color: #edf4f2; max-height: 260px; overflow: auto; padding: 12px; white-space: pre-wrap; }
+      .message { color: var(--muted); font-size: 13px; min-height: 18px; }
+      .message.bad { color: var(--bad); }
+      .message.good { color: var(--good); }
+      .hint { background: #ecfdf3; border: 1px solid #b7ebc6; border-radius: 8px; color: #126138; font-size: 13px; margin: 12px 0; padding: 10px; }
+      .guided-box { background: #f8fbfd; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 16px; padding: 12px; }
+      .guided-fields { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .guided-fields .wide { grid-column: 1 / -1; }
+      .record-box { background: #fffaf0; border: 1px solid #f4d29a; border-radius: 8px; margin: 12px 0; padding: 12px; }
+      .record-box strong { display: block; font-size: 14px; margin-bottom: 4px; }
+      .record-box p { color: #73510d; font-size: 13px; margin: 0 0 10px; }
+      .hidden { display: none; }
+      @media (max-width: 1180px) { .shell, .grid, .builder, .metrics, .step-fields { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <nav>
+        <h1>HUB RPA</h1>
+        <p>Crie robos sem escrever JSON.</p>
+        <button class="tab active" data-view="dashboard">Dashboard</button>
+        <button class="tab" data-view="robots">Robos</button>
+        <button class="tab" data-view="runs">Execucoes</button>
+        <button class="tab" data-view="workers">Workers</button>
+        <button class="tab" data-view="secrets">Segredos</button>
+        <button class="tab" data-view="schedules">Agendas</button>
+      </nav>
+      <main>
+        <div class="topbar"><h2 id="view-title">Dashboard</h2><span class="status" id="api-status">Conectando...</span></div>
+
+        <section id="dashboard" class="view active">
+          <div class="metrics" id="metrics"></div>
+          <div class="panel"><h3>Execucoes recentes</h3><table class="table" id="recent-runs"></table></div>
+        </section>
+
+        <section id="robots" class="view">
+          <div class="grid">
+            <div class="panel">
+              <div class="guided-box">
+                <h3>Novo robo guiado</h3>
+                <form id="guided-form">
+                  <label>O que o robo deve fazer?</label>
+                  <select name="template" id="guided-template">
+                    <option value="open_site">Abrir um site e tirar evidencia</option>
+                    <option value="login">Entrar em um sistema</option>
+                    <option value="download_excel">Entrar e baixar Excel</option>
+                    <option value="dated_report">Filtrar datas e baixar relatorio</option>
+                  </select>
+                  <label>Nome do robo</label><input name="name" required placeholder="Producao diaria" />
+                  <label>Site inicial</label><input name="url" required placeholder="https://sistema..." />
+                  <div class="guided-fields">
+                    <div class="login-field"><label>Rotulo do usuario</label><input name="username_label" placeholder="Usuario" /></div>
+                    <div class="login-field"><label>Usuario</label><input name="username_value" placeholder="meu.usuario" /></div>
+                    <div class="login-field"><label>Rotulo da senha</label><input name="password_label" placeholder="Senha" /></div>
+                    <div class="login-field"><label>Segredo da senha</label><input name="password_secret" placeholder="portal.password" /></div>
+                    <div class="login-field wide"><label>Texto do botao entrar</label><input name="login_button_text" placeholder="Entrar" /></div>
+                    <div class="report-field wide"><label>Menu ou aba do relatorio</label><input name="menu_text" placeholder="Relatorios" /></div>
+                    <div class="date-field"><label>Rotulo data inicial</label><input name="start_date_label" placeholder="Data Inicial" /></div>
+                    <div class="date-field"><label>Valor data inicial</label><input name="start_date_value" value="{{ontem}}" /></div>
+                    <div class="date-field"><label>Rotulo data final</label><input name="end_date_label" placeholder="Data Final" /></div>
+                    <div class="date-field"><label>Valor data final</label><input name="end_date_value" value="{{ontem}}" /></div>
+                    <div class="date-field wide"><label>Texto do botao pesquisar</label><input name="search_button_text" placeholder="Pesquisar" /></div>
+                    <div class="download-field"><label>Texto do botao exportar</label><input name="export_button_text" placeholder="Exportar Excel" /></div>
+                    <div class="download-field"><label>Nome do arquivo</label><input name="filename" value="relatorio_{{run_date}}.xlsx" /></div>
+                  </div>
+                  <div class="toolbar"><button>Criar com assistente</button></div>
+                </form>
+              </div>
+              <h3>Novo robo</h3>
+              <form id="robot-form">
+                <label>Nome</label><input name="name" required placeholder="Producao diaria" />
+                <label>URL inicial</label><input name="start_url" placeholder="https://sistema..." />
+                <label>Descricao</label><input name="description" placeholder="Baixar relatorio, filtrar datas e salvar Excel" />
+                <div class="toolbar"><button>Criar robo</button></div>
+              </form>
+              <div class="toolbar"><button id="create-demo" class="secondary">Criar teste pronto</button></div>
+              <h3 style="margin-top: 20px">Robos cadastrados</h3>
+              <div class="list" id="robot-list"></div>
+            </div>
+            <div class="panel">
+              <h3 id="robot-title">Selecione um robo</h3>
+              <div class="status" id="robot-meta"></div>
+              <div class="toolbar">
+                <button id="show-record">Gravar navegacao</button>
+                <button id="save-workflow">Salvar fluxo</button>
+                <button id="validate-workflow" class="secondary">Validar</button>
+                <button id="publish-version" class="secondary">Publicar</button>
+                <button id="new-version" class="secondary">Nova versao</button>
+                <button id="run-visible">Executar visivel</button>
+                <button id="run-headless" class="secondary">Executar oculto</button>
+              </div>
+              <div class="record-box hidden" id="record-box">
+                <strong>Gravar navegacao do robo</strong>
+                <p>O HUB vai abrir um Chromium. Faca o processo normalmente: navegue, clique, preencha campos e clique no arquivo para baixar. Quando terminar, volte aqui e finalize a gravacao.</p>
+                <label>Site inicial</label><input id="record-url" placeholder="https://sistema..." />
+                <div class="status" id="record-status">Nenhuma gravacao em andamento.</div>
+                <div class="toolbar">
+                  <button id="start-record">Iniciar gravacao</button>
+                  <button id="stop-record" class="secondary">Finalizar gravacao</button>
+                  <button id="hide-record" class="secondary">Cancelar</button>
+                </div>
+              </div>
+              <div class="hint">Para testar agora: clique em "Criar teste pronto", depois em "Executar visivel". Para ensinar um site real, use "Gravar navegacao".</div>
+              <div class="builder">
+                <div>
+                  <h3>Passos do robo</h3>
+                  <div id="steps" class="steps"></div>
+                </div>
+                <div>
+                  <h3>Adicionar passo</h3>
+                  <form id="step-form">
+                    <label>Tipo</label>
+                    <select name="type">
+                      <option value="goto">Abrir site</option>
+                      <option value="click">Clicar</option>
+                      <option value="fill">Preencher campo</option>
+                      <option value="secret_fill">Preencher senha/segredo</option>
+                      <option value="select">Selecionar opcao</option>
+                      <option value="press">Pressionar tecla</option>
+                      <option value="wait_for">Esperar aparecer</option>
+                      <option value="assert_text">Validar texto</option>
+                      <option value="download">Baixar arquivo</option>
+                      <option value="screenshot">Tirar evidencia</option>
+                      <option value="delay">Aguardar tempo</option>
+                    </select>
+                    <label>URL</label><input name="url" placeholder="https://sistema..." />
+                    <label>Como encontrar o elemento</label>
+                    <select name="target_kind">
+                      <option value="text">Texto visivel</option>
+                      <option value="label">Rotulo do campo</option>
+                      <option value="role">Botao/link por nome</option>
+                      <option value="css">Seletor CSS</option>
+                    </select>
+                    <label>Texto, rotulo, nome ou CSS</label><input name="target_value" placeholder="Exportar Excel" />
+                    <label>Valor a preencher/validar</label><input name="value" placeholder="{{ontem}}" />
+                    <div class="toolbar">
+                      <button type="button" class="secondary tiny" onclick="document.querySelector('[name=value]').value='{{hoje}}'">Hoje</button>
+                      <button type="button" class="secondary tiny" onclick="document.querySelector('[name=value]').value='{{ontem}}'">Ontem</button>
+                      <button type="button" class="secondary tiny" onclick="document.querySelector('[name=value]').value='{{run_date}}'">Data da execucao</button>
+                    </div>
+                    <label>Segredo</label><input name="secret" placeholder="portal.password" />
+                    <label>Arquivo</label><input name="filename" placeholder="relatorio_{{run_date}}.xlsx" />
+                    <label>Tecla</label><input name="key" placeholder="Enter" />
+                    <label>Timeout em ms</label><input name="timeout_ms" type="number" value="30000" min="100" />
+                    <div class="toolbar"><button>Adicionar</button></div>
+                  </form>
+                </div>
+              </div>
+              <details>
+                <summary>Modo tecnico</summary>
+                <label>JSON gerado automaticamente</label>
+                <textarea id="workflow"></textarea>
+                <div class="toolbar"><button id="apply-json" class="secondary">Atualizar passos pelo JSON</button></div>
+              </details>
+              <p class="message" id="robot-message"></p>
+            </div>
+          </div>
+        </section>
+
+        <section id="runs" class="view">
+          <div class="panel"><h3>Historico de execucoes</h3><table class="table" id="runs-table"></table></div>
+          <div class="panel" style="margin-top: 14px"><h3>Detalhe</h3><pre id="run-detail">Selecione uma execucao.</pre></div>
+        </section>
+
+        <section id="workers" class="view">
+          <div class="grid">
+            <div class="panel">
+              <h3>Registrar worker</h3>
+              <form id="worker-form">
+                <label>Nome</label><input name="name" required placeholder="AUTO-01" />
+                <label>ID da maquina</label><input name="machine_id" required placeholder="hostname-ou-guid" />
+                <label>Tags separadas por virgula</label><input name="tags" placeholder="windows, portal-producao, excel" />
+                <label>Execucoes simultaneas</label><input name="max_concurrent_runs" type="number" value="1" min="1" />
+                <div class="toolbar"><button>Registrar</button></div>
+              </form>
+            </div>
+            <div class="panel"><h3>Workers</h3><table class="table" id="workers-table"></table></div>
+          </div>
+        </section>
+
+        <section id="secrets" class="view">
+          <div class="grid">
+            <div class="panel">
+              <h3>Novo segredo</h3>
+              <form id="secret-form">
+                <label>Nome logico</label><input name="name" required placeholder="portal_producao.password" />
+                <label>Valor</label><input name="value" required type="password" />
+                <label>Descricao</label><input name="description" placeholder="Senha do portal de producao" />
+                <div class="toolbar"><button>Salvar segredo</button></div>
+              </form>
+            </div>
+            <div class="panel"><h3>Segredos cadastrados</h3><table class="table" id="secrets-table"></table></div>
+          </div>
+        </section>
+
+        <section id="schedules" class="view">
+          <div class="grid">
+            <div class="panel">
+              <h3>Nova agenda</h3>
+              <form id="schedule-form">
+                <label>Robo</label><select name="robot_id" id="schedule-robot"></select>
+                <label>Nome</label><input name="name" required placeholder="Producao 07h" />
+                <label>Cron</label><input name="cron" required placeholder="0 7 * * 1-5" />
+                <label>Inputs JSON</label><textarea name="inputs" style="min-height: 120px">{}</textarea>
+                <div class="toolbar"><button>Criar agenda</button></div>
+              </form>
+            </div>
+            <div class="panel"><h3>Agendas</h3><table class="table" id="schedules-table"></table></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      let robots = [];
+      let selectedRobot = null;
+      let selectedVersion = null;
+      let visualSteps = [];
+      let activeRecording = null;
+      let recordingTimer = null;
+      const labels = {
+        goto: "Abrir site",
+        click: "Clicar",
+        fill: "Preencher campo",
+        secret_fill: "Preencher segredo",
+        select: "Selecionar opcao",
+        press: "Pressionar tecla",
+        wait_for: "Esperar aparecer",
+        assert_text: "Validar texto",
+        download: "Baixar arquivo",
+        screenshot: "Tirar evidencia",
+        delay: "Aguardar tempo",
+      };
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, { headers: { "Content-Type": "application/json", ...(options.headers || {}) }, ...options });
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          if (body.detail && body.detail.errors) throw new Error(body.detail.errors.join(" | "));
+          if (body.detail && body.detail.message) throw new Error(body.detail.message);
+          throw new Error(body.detail || `Erro HTTP ${response.status}`);
+        }
+        return response.json();
+      }
+      function pill(value) { return `<span class="pill ${value}">${value}</span>`; }
+      function setMessage(id, text, kind = "") { const el = document.querySelector(id); el.textContent = text; el.className = `message ${kind}`; }
+      function targetFrom(kind, value) {
+        if (!value) return undefined;
+        if (kind === "label") return { label: value };
+        if (kind === "role") return { role: "button", name: value };
+        if (kind === "css") return { css: value };
+        return { text: value };
+      }
+      function targetKindAndValue(target = {}) {
+        if (target.label) return ["label", target.label];
+        if (target.css) return ["css", target.css];
+        if (target.role || target.name) return ["role", target.name || ""];
+        return ["text", target.text || ""];
+      }
+      function workflowFromSteps() {
+        return {
+          inputs: {},
+          steps: visualSteps.map((step) => {
+            const output = { type: step.type };
+            ["url", "value", "filename", "name", "secret", "key"].forEach((field) => {
+              if (step[field]) output[field] = step[field];
+            });
+            if (step.target && Object.keys(step.target).length) output.target = step.target;
+            output.timeout_ms = Number(step.timeout_ms || 30000);
+            return output;
+          }),
+        };
+      }
+      function stepsFromWorkflow(workflow) {
+        return (workflow.steps || []).map((step) => ({ timeout_ms: 30000, ...step }));
+      }
+      function syncJson() {
+        document.querySelector("#workflow").value = JSON.stringify(workflowFromSteps(), null, 2);
+      }
+      function updateStep(index, field, value) {
+        if (field === "target_kind" || field === "target_value") {
+          const [kind, currentValue] = targetKindAndValue(visualSteps[index].target);
+          const nextKind = field === "target_kind" ? value : kind;
+          const nextValue = field === "target_value" ? value : currentValue;
+          visualSteps[index].target = targetFrom(nextKind, nextValue);
+        } else {
+          visualSteps[index][field] = value;
+        }
+        syncJson();
+      }
+      function removeStep(index) {
+        visualSteps.splice(index, 1);
+        renderSteps();
+      }
+      function duplicateStep(index) {
+        visualSteps.splice(index + 1, 0, JSON.parse(JSON.stringify(visualSteps[index])));
+        renderSteps();
+      }
+      function moveStep(index, direction) {
+        const next = index + direction;
+        if (next < 0 || next >= visualSteps.length) return;
+        const [step] = visualSteps.splice(index, 1);
+        visualSteps.splice(next, 0, step);
+        renderSteps();
+      }
+      function renderSteps() {
+        const container = document.querySelector("#steps");
+        if (!visualSteps.length) {
+          container.innerHTML = `<div class="empty">Use "Ensinar Robo" ou adicione passos pelo formulario ao lado.</div>`;
+          syncJson();
+          return;
+        }
+        container.innerHTML = visualSteps.map((step, index) => {
+          const [kind, targetValue] = targetKindAndValue(step.target);
+          return `
+            <div class="step">
+              <div class="step-head">
+                <div class="step-title"><span class="step-number">${String(index + 1).padStart(2, "0")}</span><strong>${labels[step.type] || step.type}</strong></div>
+                <div class="toolbar" style="margin: 0">
+                  <button class="secondary" onclick="moveStep(${index}, -1)">Subir</button>
+                  <button class="secondary" onclick="moveStep(${index}, 1)">Descer</button>
+                  <button class="secondary" onclick="duplicateStep(${index})">Duplicar</button>
+                  <button class="danger" onclick="removeStep(${index})">Excluir</button>
+                </div>
+              </div>
+              <div class="step-fields">
+                <div><label>Tipo</label><select onchange="updateStep(${index}, 'type', this.value)">${Object.entries(labels).map(([value, label]) => `<option value="${value}" ${step.type === value ? "selected" : ""}>${label}</option>`).join("")}</select></div>
+                <div><label>Timeout</label><input type="number" value="${step.timeout_ms || 30000}" onchange="updateStep(${index}, 'timeout_ms', this.value)" /></div>
+                <div class="wide"><label>URL</label><input value="${step.url || ""}" placeholder="https://sistema..." onchange="updateStep(${index}, 'url', this.value)" /></div>
+                <div><label>Busca do elemento</label><select onchange="updateStep(${index}, 'target_kind', this.value)">
+                  <option value="text" ${kind === "text" ? "selected" : ""}>Texto visivel</option>
+                  <option value="label" ${kind === "label" ? "selected" : ""}>Rotulo do campo</option>
+                  <option value="role" ${kind === "role" ? "selected" : ""}>Botao/link por nome</option>
+                  <option value="css" ${kind === "css" ? "selected" : ""}>Seletor CSS</option>
+                </select></div>
+                <div><label>Texto, rotulo, nome ou CSS</label><input value="${targetValue}" onchange="updateStep(${index}, 'target_value', this.value)" /></div>
+                <div><label>Valor</label><input value="${step.value || ""}" placeholder="{{ontem}}" onchange="updateStep(${index}, 'value', this.value)" /></div>
+                <div><label>Segredo</label><input value="${step.secret || ""}" placeholder="portal.password" onchange="updateStep(${index}, 'secret', this.value)" /></div>
+                <div><label>Arquivo</label><input value="${step.filename || step.name || ""}" onchange="updateStep(${index}, step.type === 'screenshot' ? 'name' : 'filename', this.value)" /></div>
+                <div><label>Tecla</label><input value="${step.key || ""}" placeholder="Enter" onchange="updateStep(${index}, 'key', this.value)" /></div>
+              </div>
+            </div>
+          `;
+        }).join("");
+        syncJson();
+      }
+      async function refreshAll() {
+        await Promise.all([loadDashboard(), loadRobots(), loadRuns(), loadWorkers(), loadSecrets(), loadSchedules()]);
+        document.querySelector("#api-status").textContent = "API conectada";
+      }
+      async function loadDashboard() {
+        const data = await api("/dashboard");
+        const items = [["Robos", data.robots_total], ["Ativos", data.robots_active], ["Runs", data.runs_total], ["Sucesso", data.runs_success], ["Falhas", data.runs_failed], ["Workers", data.workers_online]];
+        document.querySelector("#metrics").innerHTML = items.map(([label, value]) => `<div class="metric"><span>${label}</span><strong>${value}</strong></div>`).join("");
+        renderRunsTable("#recent-runs", data.recent_runs);
+      }
+      async function loadRobots() {
+        robots = await api("/robots");
+        document.querySelector("#robot-list").innerHTML = robots.map((robot) => `<div class="item ${selectedRobot?.id === robot.id ? "active" : ""}" onclick="selectRobot(${robot.id})"><strong>${robot.name}</strong><small>${robot.status} - versao ${robot.latest_version_id || "-"}</small></div>`).join("");
+        document.querySelector("#schedule-robot").innerHTML = robots.map((robot) => `<option value="${robot.id}">${robot.name}</option>`).join("");
+      }
+      async function selectRobot(id) {
+        selectedRobot = robots.find((robot) => robot.id === id);
+        selectedVersion = await api(`/robots/${id}/versions/latest`);
+        visualSteps = stepsFromWorkflow(selectedVersion.workflow);
+        document.querySelector("#robot-title").textContent = selectedRobot.name;
+        document.querySelector("#robot-meta").innerHTML = `${pill(selectedRobot.status)} ${pill(selectedVersion.status)} versao ${selectedVersion.version}`;
+        setMessage("#robot-message", "");
+        renderSteps();
+        await loadRobots();
+      }
+      async function loadRuns() { renderRunsTable("#runs-table", await api("/runs")); }
+      function renderRunsTable(selector, runs) {
+        document.querySelector(selector).innerHTML = `<tr><th>ID</th><th>Robo</th><th>Status</th><th>Inicio</th><th>Fim</th><th>Erro</th></tr>${runs.map((run) => `<tr onclick="showRun(${run.id})"><td>${run.id}</td><td>${run.robot_id}</td><td>${pill(run.status)}</td><td>${run.started_at || "-"}</td><td>${run.finished_at || "-"}</td><td>${run.error || "-"}</td></tr>`).join("")}`;
+      }
+      async function showRun(id) { document.querySelector("#run-detail").textContent = JSON.stringify(await api(`/runs/${id}`), null, 2); }
+      async function loadWorkers() {
+        const workers = await api("/workers");
+        document.querySelector("#workers-table").innerHTML = `<tr><th>Nome</th><th>Status</th><th>Tags</th><th>Heartbeat</th></tr>${workers.map((worker) => `<tr><td>${worker.name}</td><td>${pill(worker.status)}</td><td>${worker.tags.join(", ")}</td><td>${worker.last_heartbeat_at || "-"}</td></tr>`).join("")}`;
+      }
+      async function loadSecrets() {
+        const secrets = await api("/secrets");
+        document.querySelector("#secrets-table").innerHTML = `<tr><th>Nome</th><th>Tipo</th><th>Descricao</th><th>Atualizado</th></tr>${secrets.map((secret) => `<tr><td>${secret.name}</td><td>${secret.secret_type}</td><td>${secret.description}</td><td>${secret.updated_at || "-"}</td></tr>`).join("")}`;
+      }
+      async function loadSchedules() {
+        const schedules = await api("/schedules");
+        document.querySelector("#schedules-table").innerHTML = `<tr><th>Nome</th><th>Robo</th><th>Cron</th><th>Status</th></tr>${schedules.map((schedule) => `<tr><td>${schedule.name}</td><td>${schedule.robot_id}</td><td>${schedule.cron}</td><td>${schedule.enabled ? "ativa" : "pausada"}</td></tr>`).join("")}`;
+      }
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          document.querySelectorAll(".tab, .view").forEach((el) => el.classList.remove("active"));
+          tab.classList.add("active");
+          document.querySelector(`#${tab.dataset.view}`).classList.add("active");
+          document.querySelector("#view-title").textContent = tab.textContent;
+        });
+      });
+      document.querySelector("#robot-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const robot = await api("/robots", { method: "POST", body: JSON.stringify(Object.fromEntries(new FormData(event.target).entries())) });
+        event.target.reset();
+        await refreshAll();
+        await selectRobot(robot.id);
+      });
+      function updateGuidedFields() {
+        const template = document.querySelector("#guided-template").value;
+        const showLogin = ["login", "download_excel", "dated_report"].includes(template);
+        const showReport = ["download_excel", "dated_report"].includes(template);
+        const showDate = template === "dated_report";
+        const showDownload = ["download_excel", "dated_report"].includes(template);
+        document.querySelectorAll(".login-field").forEach((field) => field.classList.toggle("hidden", !showLogin));
+        document.querySelectorAll(".report-field").forEach((field) => field.classList.toggle("hidden", !showReport));
+        document.querySelectorAll(".date-field").forEach((field) => field.classList.toggle("hidden", !showDate));
+        document.querySelectorAll(".download-field").forEach((field) => field.classList.toggle("hidden", !showDownload));
+      }
+      document.querySelector("#guided-template").addEventListener("change", updateGuidedFields);
+      document.querySelector("#guided-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const payload = Object.fromEntries(new FormData(event.target).entries());
+        const robot = await api("/robots/guided", { method: "POST", body: JSON.stringify(payload) });
+        event.target.reset();
+        document.querySelector("[name='start_date_value']").value = "{{ontem}}";
+        document.querySelector("[name='end_date_value']").value = "{{ontem}}";
+        document.querySelector("[name='filename']").value = "relatorio_{{run_date}}.xlsx";
+        updateGuidedFields();
+        await refreshAll();
+        await selectRobot(robot.id);
+        setMessage("#robot-message", "Robo criado pelo modo guiado. Revise os passos, clique em Publicar e execute.", "good");
+      });
+      document.querySelector("#create-demo").addEventListener("click", async () => {
+        const robot = await api("/robots/demo", { method: "POST" });
+        await refreshAll();
+        await selectRobot(robot.id);
+        setMessage("#robot-message", "Teste pronto criado. Clique em Executar visivel para ver funcionando.", "good");
+      });
+      document.querySelector("#step-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const data = Object.fromEntries(new FormData(event.target).entries());
+        const step = { type: data.type, timeout_ms: Number(data.timeout_ms || 30000) };
+        if (data.url) step.url = data.url;
+        step.target = targetFrom(data.target_kind, data.target_value);
+        ["value", "secret", "filename", "key"].forEach((field) => { if (data[field]) step[field] = data[field]; });
+        if (data.type === "screenshot" && data.filename) { step.name = data.filename; delete step.filename; }
+        visualSteps.push(step);
+        event.target.reset();
+        event.target.timeout_ms.value = 30000;
+        renderSteps();
+      });
+      document.querySelector("#save-workflow").addEventListener("click", async () => {
+        if (!selectedVersion) return setMessage("#robot-message", "Selecione um robo.", "bad");
+        selectedVersion = await api(`/robot-versions/${selectedVersion.id}`, { method: "PUT", body: JSON.stringify({ workflow: workflowFromSteps() }) });
+        setMessage("#robot-message", "Fluxo salvo automaticamente.", "good");
+      });
+      document.querySelector("#validate-workflow").addEventListener("click", async () => {
+        if (!selectedVersion) return setMessage("#robot-message", "Selecione uma versao.", "bad");
+        selectedVersion = await api(`/robot-versions/${selectedVersion.id}`, { method: "PUT", body: JSON.stringify({ workflow: workflowFromSteps() }) });
+        const result = await api(`/robot-versions/${selectedVersion.id}/validate`);
+        if (result.valid) return setMessage("#robot-message", "Fluxo validado. Pode publicar.", "good");
+        setMessage("#robot-message", result.errors.join(" | "), "bad");
+      });
+      document.querySelector("#apply-json").addEventListener("click", () => {
+        try {
+          visualSteps = stepsFromWorkflow(JSON.parse(document.querySelector("#workflow").value));
+          renderSteps();
+          setMessage("#robot-message", "Passos atualizados pelo JSON.", "good");
+        } catch (error) { setMessage("#robot-message", error.message, "bad"); }
+      });
+      document.querySelector("#show-record").addEventListener("click", () => {
+        if (!selectedRobot) return setMessage("#robot-message", "Selecione um robo.", "bad");
+        document.querySelector("#record-url").value = selectedRobot.start_url || "";
+        document.querySelector("#record-box").classList.remove("hidden");
+      });
+      document.querySelector("#hide-record").addEventListener("click", () => {
+        document.querySelector("#record-box").classList.add("hidden");
+      });
+      document.querySelector("#start-record").addEventListener("click", async () => {
+        if (!selectedRobot) return setMessage("#robot-message", "Selecione um robo.", "bad");
+        const url = document.querySelector("#record-url").value.trim();
+        if (!url) return setMessage("#robot-message", "Informe o site inicial para gravar.", "bad");
+        activeRecording = await api(`/robots/${selectedRobot.id}/teach/start`, { method: "POST", body: JSON.stringify({ url }) });
+        document.querySelector("#record-status").textContent = "Gravando... 0 acoes capturadas.";
+        setMessage("#robot-message", "Gravando. Use a janela do Chromium. Quando terminar, clique em Finalizar gravacao.", "");
+        if (recordingTimer) clearInterval(recordingTimer);
+        recordingTimer = setInterval(refreshRecordingStatus, 1500);
+      });
+      document.querySelector("#stop-record").addEventListener("click", async () => {
+        if (!selectedRobot || !activeRecording) return setMessage("#robot-message", "Nenhuma gravacao em andamento.", "bad");
+        if (recordingTimer) clearInterval(recordingTimer);
+        document.querySelector("#record-status").textContent = "Finalizando gravacao...";
+        selectedVersion = await api(`/robots/${selectedRobot.id}/teach/stop/${activeRecording.session_id}`, { method: "POST" });
+        activeRecording = null;
+        visualSteps = stepsFromWorkflow(selectedVersion.workflow);
+        renderSteps();
+        await refreshAll();
+        await selectRobot(selectedRobot.id);
+        document.querySelector("#record-box").classList.add("hidden");
+        setMessage("#robot-message", `Gravacao importada com ${visualSteps.length} passos. Revise, publique e execute.`, "good");
+      });
+      async function refreshRecordingStatus() {
+        if (!activeRecording) return;
+        try {
+          const status = await api(`/teach-sessions/${activeRecording.session_id}`);
+          document.querySelector("#record-status").textContent = `${status.status}: ${status.events_count} acoes capturadas.`;
+          if (status.status === "failed") {
+            clearInterval(recordingTimer);
+            setMessage("#robot-message", status.error || "Falha na gravacao.", "bad");
+          }
+        } catch (error) {
+          clearInterval(recordingTimer);
+          setMessage("#robot-message", error.message, "bad");
+        }
+      }
+      document.querySelector("#new-version").addEventListener("click", async () => {
+        if (!selectedRobot) return setMessage("#robot-message", "Selecione um robo.", "bad");
+        selectedVersion = await api(`/robots/${selectedRobot.id}/versions`, { method: "POST", body: JSON.stringify({ workflow: workflowFromSteps() }) });
+        await selectRobot(selectedRobot.id);
+        setMessage("#robot-message", "Nova versao criada.", "good");
+      });
+      document.querySelector("#publish-version").addEventListener("click", async () => {
+        if (!selectedVersion) return setMessage("#robot-message", "Selecione uma versao.", "bad");
+        try {
+          selectedVersion = await api(`/robot-versions/${selectedVersion.id}`, { method: "PUT", body: JSON.stringify({ workflow: workflowFromSteps() }) });
+          selectedVersion = await api(`/robot-versions/${selectedVersion.id}/publish`, { method: "POST" });
+          await refreshAll();
+          await selectRobot(selectedRobot.id);
+          setMessage("#robot-message", "Versao publicada.", "good");
+        } catch (error) {
+          const text = typeof error.message === "string" ? error.message : "Corrija o fluxo antes de publicar.";
+          setMessage("#robot-message", text, "bad");
+        }
+      });
+      async function runSelected(headless) {
+        if (!selectedRobot) return setMessage("#robot-message", "Selecione um robo.", "bad");
+        const run = await api(`/robots/${selectedRobot.id}/run`, { method: "POST", body: JSON.stringify({ inputs: {}, headless }) });
+        setMessage("#robot-message", `Execucao enviada para fila: run ${run.id}.`, "good");
+        await loadRuns();
+        setTimeout(refreshAll, 1500);
+      }
+      document.querySelector("#run-visible").addEventListener("click", () => runSelected(false));
+      document.querySelector("#run-headless").addEventListener("click", () => runSelected(true));
+      document.querySelector("#worker-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const data = Object.fromEntries(new FormData(event.target).entries());
+        data.tags = data.tags.split(",").map((tag) => tag.trim()).filter(Boolean);
+        data.max_concurrent_runs = Number(data.max_concurrent_runs || 1);
+        await api("/workers/register", { method: "POST", body: JSON.stringify(data) });
+        event.target.reset();
+        await refreshAll();
+      });
+      document.querySelector("#secret-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        await api("/secrets", { method: "POST", body: JSON.stringify(Object.fromEntries(new FormData(event.target).entries())) });
+        event.target.reset();
+        await refreshAll();
+      });
+      document.querySelector("#schedule-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const data = Object.fromEntries(new FormData(event.target).entries());
+        data.robot_id = Number(data.robot_id);
+        data.inputs = JSON.parse(data.inputs || "{}");
+        await api("/schedules", { method: "POST", body: JSON.stringify(data) });
+        event.target.reset();
+        event.target.inputs.value = "{}";
+        await refreshAll();
+      });
+      renderSteps();
+      updateGuidedFields();
+      refreshAll().catch((error) => { document.querySelector("#api-status").textContent = error.message; });
+      setInterval(() => {
+        if (activeRecording) return;
+        refreshAll().catch(() => {});
+      }, 30000);
+    </script>
+  </body>
+</html>

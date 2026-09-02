@@ -1,0 +1,20 @@
+{
+  "inputs": {},
+  "steps": [
+    {
+      "type": "goto",
+      "url": "https://example.com"
+    },
+    {
+      "type": "wait_for",
+      "target": {
+        "text": "Example Domain"
+      },
+      "timeout_ms": 10000
+    },
+    {
+      "type": "screenshot",
+      "name": "example-home"
+    }
+  ]
+}
