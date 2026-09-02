@@ -80,13 +80,26 @@ class WorkflowExecutor:
         for index, step in enumerate(steps, start=1):
             attempts = step.retry + 1
             for attempt in range(1, attempts + 1):
+                started = time.monotonic()
                 try:
                     self._log(log, "INFO", f"Executando etapa {index}: {step.type}", {"step": index, "attempt": attempt})
                     created = self._execute_step(page, step, context, index)
                     artifacts.extend(created)
+                    self._log(
+                        log,
+                        "INFO",
+                        f"Etapa {index} concluida: {step.type}",
+                        {"step": index, "type": step.type, "status": "SUCCESS", "duration_ms": round((time.monotonic() - started) * 1000)},
+                    )
                     break
                 except Exception as exc:
                     if attempt >= attempts:
+                        self._log(
+                            log,
+                            "ERROR",
+                            f"Etapa {index} falhou: {step.type} - {exc}",
+                            {"step": index, "type": step.type, "status": "FAILED", "duration_ms": round((time.monotonic() - started) * 1000)},
+                        )
                         raise
                     self._log(log, "WARN", f"Retry da etapa {index}: {exc}", {"step": index, "attempt": attempt})
         return artifacts

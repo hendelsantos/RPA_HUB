@@ -5,11 +5,14 @@ Aplicacao de automacao robotica de processos para criar, versionar, executar e m
 ## Modulos entregues
 
 - Tela unica de Logs com indicadores, historico de execucoes, detalhes e artefatos.
+- Filtros de logs por robo e status, linha do tempo por execucao e download de artefatos.
 - Cadastro de robos com workflow JSON versionado.
+- Criacao de copias e backup/restauracao de robos em JSON.
 - Publicacao de versoes e criacao de novas versoes draft.
 - Execucao manual em background, com status, logs e artefatos.
 - Motor Playwright com blocos `goto`, `click`, `fill`, `secret_fill`, `select`, `press`, `wait_for`, `assert_text`, `download`, `screenshot` e `delay`.
 - Automacao local com mouse, teclado, arquivos, pastas, ZIP e comandos.
+- Diagnostico do ambiente para avisar quando o controle de mouse/teclado nao esta disponivel.
 - Cofre de credenciais local para referencias como `portal.password`.
 - Workers cadastraveis por maquina, tags e heartbeat.
 - Agendas persistidas em SQLite com formato cron.
@@ -103,12 +106,12 @@ python apps/worker/local_worker.py --hub http://127.0.0.1:8010 --name AUTO-01 --
 2. Entre em **Studio**.
 3. Em **1. Projeto do robo**, informe o nome, escolha a finalidade e indique o site inicial somente se o robo usar navegador.
 4. Clique em **Criar e continuar**.
-5. Em **2. Ensinar**, clique em **Iniciar ensino** se precisar gravar um site.
+5. Em **2. Ensinar**, clique em **Gravar site** se precisar gravar um site.
 6. O HUB abre o Chromium. Faca o processo normalmente no site.
-7. Volte ao HUB e clique em **Finalizar ensino**.
-8. Confira os passos e clique em **Aprovar ensino**.
+7. Volte ao HUB e clique em **Parar gravacao**.
+8. Confira os passos e clique em **Salvar robo**.
 9. Em **3. Execucao**, escolha se o robo sera manual, diario, de segunda a sexta ou executado a cada hora.
-10. Salve a configuracao ou clique em **Executar em segundo plano**.
+10. Salve a configuracao ou clique em **Salvar e executar**.
 
 Para automacoes locais de Windows/Linux, nao precisa informar site. Adicione os passos em **Ferramentas avancadas**, aprove o ensino e execute quando quiser. Para aprender o fluxo sem cadastrar um site, use **Criar teste pronto** na primeira etapa.
 
@@ -161,7 +164,7 @@ Em **Studio > Ensinar > Ferramentas avancadas**, use **Modelos rapidos** para in
 - **Abrir site + evidencia**
 - **Desktop simples**
 
-Depois de inserir um modelo, ajuste os campos, confira os passos e clique em **Aprovar ensino**.
+Depois de inserir um modelo, ajuste os campos, confira os passos e clique em **Salvar robo**.
 
 ## Gerenciar robos
 
@@ -169,6 +172,9 @@ Na lista **Meus robos**:
 
 - **Continuar** abre o robo para editar os passos atuais.
 - **Reconfigurar** cria uma nova versao `draft` a partir da versao atual e deixa o robo pronto para ajuste.
+- **Criar copia** cria outro robo igual para voce ajustar sem mexer no original.
+- **Baixar backup** salva um arquivo JSON com dados principais e workflow.
+- **Restaurar backup** cria um robo a partir de um arquivo JSON salvo anteriormente.
 - **Ativar** aprova o ultimo ensino valido.
 - **Executar** roda o robo ativo em segundo plano.
 - **Excluir** remove o robo, suas versoes, agendas, execucoes e vinculos de credenciais.
@@ -224,6 +230,8 @@ O mesmo robo tambem pode executar passos locais no Windows ou Linux sem precisar
 - `file_zip`: compacta arquivo ou pasta em ZIP.
 - `file_unzip`: extrai um ZIP.
 - `command_run`: executa um programa ou comando local.
+
+Para controlar mouse e teclado com passos `desktop_*`, o Hub precisa estar rodando na mesma sessao grafica do usuario. Em Linux, se aparecer mensagem sobre `DISPLAY` ou `XAUTHORITY`, use robos de navegador/arquivos ou reinicie o Hub dentro da tela grafica correta.
 
 Exemplo:
 

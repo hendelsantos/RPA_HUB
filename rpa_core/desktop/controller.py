@@ -1,7 +1,31 @@
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
+
+
+DESKTOP_UNAVAILABLE_MESSAGE = (
+    "Controle do PC nao esta disponivel nesta sessao. No Linux, inicie o Hub dentro da mesma tela grafica do usuario "
+    "ou configure DISPLAY e XAUTHORITY. Enquanto isso, robos de site e arquivos continuam funcionando."
+)
+
+
+def desktop_environment_status() -> dict[str, str | bool]:
+    if os.name != "nt" and not os.getenv("DISPLAY") and not os.getenv("WAYLAND_DISPLAY"):
+        return {
+            "available": False,
+            "message": "Controle do PC precisa de uma sessao grafica aberta. Nenhum DISPLAY/WAYLAND_DISPLAY foi encontrado.",
+        }
+    try:
+        import pyautogui
+
+        pyautogui.size()
+    except ModuleNotFoundError:
+        return {"available": False, "message": "Controle do PC requer pyautogui instalado."}
+    except Exception:
+        return {"available": False, "message": DESKTOP_UNAVAILABLE_MESSAGE}
+    return {"available": True, "message": "Controle do PC disponivel nesta sessao."}
 
 
 class DesktopController:
@@ -10,6 +34,8 @@ class DesktopController:
             import pyautogui
         except ModuleNotFoundError as exc:
             raise RuntimeError("Automacao de desktop requer pyautogui instalado.") from exc
+        except Exception as exc:
+            raise RuntimeError(DESKTOP_UNAVAILABLE_MESSAGE) from exc
 
         self.pyautogui = pyautogui
         self.pyautogui.FAILSAFE = True

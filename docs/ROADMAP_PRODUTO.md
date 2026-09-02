@@ -57,12 +57,12 @@ Problema atual: a tela de logs ainda mostra informacoes tecnicas demais.
 
 Melhoria:
 
-- Linha do tempo por execucao.
-- Status por passo.
-- Duracao por passo.
-- Artefatos clicaveis.
+- Linha do tempo por execucao. **Iniciado.**
+- Status por passo. **Iniciado.**
+- Duracao por passo. **Iniciado.**
+- Artefatos clicaveis. **Iniciado.**
 - Evidencia de erro destacada.
-- Filtro por robo, status e data.
+- Filtro por robo, status e data. **Iniciado para robo e status.**
 
 Resultado esperado: entender falhas rapidamente.
 
@@ -78,7 +78,7 @@ Melhoria:
   - versoes
   - agendas
   - ultima execucao
-  - botoes de executar, ativar, reconfigurar, duplicar e excluir
+  - botoes de executar, ativar, reconfigurar, criar copia e excluir
 
 Resultado esperado: cada robo fica facil de operar e manter.
 
@@ -105,8 +105,8 @@ Melhoria:
 Melhoria:
 
 - Templates reutilizaveis de workflow. **Iniciado.**
-- Importar/exportar robos em JSON.
-- Duplicar robos existentes.
+- Baixar e restaurar backup de robos em JSON. **Iniciado.**
+- Criar copias de robos existentes. **Iniciado.**
 
 ## Prioridade 3 - Produto e operacao
 

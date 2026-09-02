@@ -59,6 +59,14 @@ def test_file_system_workflow_validation_requires_paths():
     assert "Passo 3 (file_write_text): informe o texto." in errors
 
 
+def test_workflow_validation_warns_about_common_url_typos():
+    workflow = {"inputs": {}, "steps": [{"type": "goto", "url": "www.goolge.com"}]}
+
+    errors = validate_workflow(workflow)
+
+    assert "Passo 1 (goto): confira a URL. Voce quis dizer https://www.google.com?" in errors
+
+
 def test_file_read_zip_unzip_and_command_steps(tmp_path):
     work_dir = tmp_path / "work"
     source_file = work_dir / "entrada.txt"

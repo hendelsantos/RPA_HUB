@@ -65,6 +65,8 @@
       .purpose-card input { height: 16px; min-height: 0; position: absolute; right: 12px; top: 12px; width: 16px; }
       .purpose-card strong { display: block; font-size: 13px; padding-right: 22px; }
       .purpose-card small { color: var(--muted); display: block; font-size: 12px; line-height: 1.4; margin-top: 4px; }
+      .quick-actions { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 12px; }
+      .quick-actions button { min-height: 54px; text-align: left; }
       .robot-list { display: grid; gap: 8px; }
       .robot-card { cursor: pointer; padding: 12px; text-align: left; width: 100%; }
       .robot-card:hover, .robot-card.active { background: #f7fbfa; border-color: var(--brand); box-shadow: inset 3px 0 0 var(--brand); }
@@ -96,6 +98,7 @@
       .metric { padding: 13px; }
       .metric span { color: var(--muted); display: block; font-size: 12px; }
       .metric strong { display: block; font-size: 23px; margin-top: 5px; }
+      .filters { align-items: end; display: grid; gap: 10px; grid-template-columns: minmax(160px, 1fr) minmax(140px, 220px) auto; margin: 12px 0; }
       .table-wrap { overflow: auto; }
       .table { border-collapse: collapse; width: 100%; }
       .table th, .table td { border-bottom: 1px solid var(--line); font-size: 12px; padding: 10px; text-align: left; vertical-align: top; }
@@ -111,7 +114,12 @@
       summary { cursor: pointer; font-size: 13px; font-weight: 750; }
       pre, #workflow { background: #101820; color: #edf4f2; font-family: Consolas, monospace; }
       pre { border-radius: 7px; max-height: 300px; overflow: auto; padding: 12px; white-space: pre-wrap; }
+      .run-detail { background: #101820; border-radius: 7px; color: #edf4f2; font-size: 12px; line-height: 1.5; max-height: 420px; overflow: auto; padding: 12px; }
+      .run-detail h4 { color: #fff; font-size: 13px; margin: 0 0 8px; }
+      .run-detail pre { margin: 0 0 12px; max-height: none; padding: 0; }
+      .run-detail .artifact-row { align-items: center; border-top: 1px solid #304050; display: flex; gap: 8px; justify-content: space-between; padding: 8px 0; }
       .callout { background: #eef4f8; border-left: 3px solid #557890; color: #405465; font-size: 13px; line-height: 1.5; margin: 12px 0; padding: 10px 12px; }
+      .callout.bad { background: #fff1f0; border-left-color: var(--bad); color: #7a271a; }
       .key-panel { align-items: center; background: rgba(16, 24, 32, 0.72); display: flex; height: 100vh; justify-content: center; left: 0; position: fixed; top: 0; width: 100vw; z-index: 50; }
       .key-panel form { background: #fff; border-radius: 10px; box-shadow: 0 18px 50px rgba(16, 24, 32, 0.35); display: grid; gap: 10px; max-width: 380px; padding: 22px; width: calc(100vw - 40px); }
       .key-panel h3 { margin: 0; }
@@ -126,7 +134,7 @@
       }
       @media (max-width: 680px) {
         main { padding: 12px; }
-        .stages, .purpose-grid, .step-fields { grid-template-columns: 1fr; }
+        .stages, .purpose-grid, .quick-actions, .step-fields, .filters { grid-template-columns: 1fr; }
         .step-fields .wide { grid-column: auto; }
         .teach-banner { align-items: stretch; flex-direction: column; }
       }
@@ -198,7 +206,20 @@
                   <div class="toolbar end"><button>Criar e continuar</button></div>
                 </form>
                 <div class="callout">Quer experimentar primeiro? Crie um robo de teste pronto e veja como as tres etapas funcionam.</div>
-                <button id="create-demo" class="secondary">Criar teste pronto</button>
+                <div class="toolbar">
+                  <button id="create-demo" class="secondary">Criar teste pronto</button>
+                  <button id="import-robot" class="secondary" type="button">Restaurar backup</button>
+                  <input id="import-robot-file" class="hidden" type="file" accept="application/json,.json" />
+                </div>
+                <div class="panel-title" style="margin-top:20px">
+                  <h3>Comecar rapido</h3>
+                  <p>Escolha um ponto de partida e preencha os nomes dos campos depois.</p>
+                </div>
+                <div class="quick-actions">
+                  <button type="button" class="secondary" onclick="quickStart('site_login')">Entrar em site com senha</button>
+                  <button type="button" class="secondary" onclick="quickStart('files')">Organizar arquivos</button>
+                  <button type="button" class="secondary" onclick="quickStart('desktop')">Controlar meu PC</button>
+                </div>
                 <p class="message" id="project-message"></p>
               </div>
               <div class="panel">
@@ -225,8 +246,8 @@
                       <p id="record-status">Use o ensino quando o robo precisar navegar em um site. Para arquivos, pastas e comandos, use Ferramentas avancadas.</p>
                     </div>
                     <div class="toolbar" style="margin:0">
-                      <button id="start-record">Iniciar ensino</button>
-                      <button id="stop-record" class="secondary" disabled>Finalizar ensino</button>
+                      <button id="start-record">Gravar site</button>
+                      <button id="stop-record" class="secondary" disabled>Parar gravacao</button>
                     </div>
                   </div>
                   <label>Site inicial para gravacao no navegador</label>
@@ -237,9 +258,9 @@
                   </div>
                   <div id="steps" class="steps"></div>
                   <div class="toolbar end">
-                    <button id="validate-workflow" class="secondary">Conferir passos</button>
-                    <button id="publish-version">Aprovar ensino</button>
-                    <button id="run-visible" class="secondary">Testar agora</button>
+                    <button id="validate-workflow" class="secondary">Verificar passos</button>
+                    <button id="publish-version">Salvar robo</button>
+                    <button id="run-visible" class="secondary">Salvar e testar</button>
                   </div>
                   <p class="message" id="robot-message"></p>
                   <details>
@@ -257,15 +278,17 @@
                     </form>
                     <div class="robot-list" id="input-list"></div>
                     <div class="panel-title" style="margin-top:18px">
-                      <h3>Modelos rapidos</h3>
-                      <p>Adicione blocos prontos e ajuste os campos depois.</p>
+                      <h3>Comecar por um modelo</h3>
+                      <p>Escolha o que mais parece com seu trabalho. Depois ajuste os campos.</p>
                     </div>
+                    <div id="desktop-status" class="callout hidden"></div>
                     <div class="purpose-grid">
-                      <button type="button" class="secondary" onclick="addTemplateSteps('local_report')">Pasta + arquivo</button>
-                      <button type="button" class="secondary" onclick="addTemplateSteps('copy_and_zip')">Copiar + ZIP</button>
-                      <button type="button" class="secondary" onclick="addTemplateSteps('run_command')">Executar comando</button>
-                      <button type="button" class="secondary" onclick="addTemplateSteps('open_site')">Abrir site + evidencia</button>
-                      <button type="button" class="secondary" onclick="addTemplateSteps('desktop_notepad')">Desktop simples</button>
+                      <button type="button" class="secondary" onclick="addTemplateSteps('site_login')">Entrar em site com senha</button>
+                      <button type="button" class="secondary" onclick="addTemplateSteps('open_site')">Abrir site e tirar print</button>
+                      <button type="button" class="secondary" onclick="addTemplateSteps('local_report')">Criar pasta e arquivo</button>
+                      <button type="button" class="secondary" onclick="addTemplateSteps('copy_and_zip')">Copiar arquivos e compactar</button>
+                      <button type="button" class="secondary" onclick="addTemplateSteps('run_command')">Rodar programa ou comando</button>
+                      <button type="button" class="secondary" onclick="addTemplateSteps('desktop_notepad')" data-requires-desktop>Controlar meu PC</button>
                     </div>
                     <form id="step-form">
                       <div class="step-fields">
@@ -383,7 +406,7 @@
                   <div id="run-inputs" class="step-fields"></div>
                   <div class="toolbar end">
                     <button>Salvar configuracao</button>
-                    <button id="run-headless" type="button" class="secondary">Executar em segundo plano</button>
+                  <button id="run-headless" type="button" class="secondary">Salvar e executar</button>
                   </div>
                 </form>
                 <p class="message" id="execution-message"></p>
@@ -401,8 +424,16 @@
 
         <section id="logs" class="view">
           <div class="metrics" id="metrics"></div>
-          <div class="panel"><h3>Logs de execucao</h3><div class="table-wrap"><table class="table" id="runs-table"></table></div></div>
-          <div class="panel" style="margin-top:14px"><h3>Detalhe</h3><pre id="run-detail">Selecione uma execucao.</pre></div>
+          <div class="panel">
+            <h3>Logs de execucao</h3>
+            <div class="filters">
+              <div><label>Robo</label><select id="run-filter-robot"><option value="">Todos</option></select></div>
+              <div><label>Status</label><select id="run-filter-status"><option value="">Todos</option><option value="QUEUED">Na fila</option><option value="RUNNING">Executando</option><option value="SUCCESS">Sucesso</option><option value="FAILED">Falha</option></select></div>
+              <button id="clear-run-filters" class="secondary" type="button">Limpar</button>
+            </div>
+            <div class="table-wrap"><table class="table" id="runs-table"></table></div>
+          </div>
+          <div class="panel" style="margin-top:14px"><h3>Detalhe</h3><div id="run-detail" class="run-detail">Selecione uma execucao.</div></div>
         </section>
 
         <section id="secrets" class="view">
@@ -434,6 +465,7 @@
       let selectedVersion = null;
       let visualSteps = [];
       let visualInputs = {};
+      let environment = { desktop: { available: true, message: "" } };
       let activeRecording = null;
       let recordingTimer = null;
       const labels = {
@@ -517,7 +549,7 @@
         return apiKeyPanelPromise;
       }
 
-      async function api(path, options = {}) {
+      async function apiResponse(path, options = {}) {
         const send = () => fetch(path, {
           ...options,
           headers: { "Content-Type": "application/json", "X-API-Key": currentApiKey(), ...(options.headers || {}) },
@@ -527,6 +559,10 @@
           const key = await askForApiKey();
           if (key) response = await send();
         }
+        return response;
+      }
+      async function api(path, options = {}) {
+        const response = await apiResponse(path, options);
         if (!response.ok) {
           const body = await response.json().catch(() => ({}));
           if (response.status === 401) throw new Error("Acesso nao autorizado. Verifique a chave de acesso.");
@@ -577,6 +613,40 @@
       function parseKeys(value = "") { return value.split("+").map((item) => item.trim()).filter(Boolean); }
       function normalizeInputKey(value = "") {
         return value.trim().replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_.-]/g, "");
+      }
+      function normalizeUrl(value = "") {
+        const clean = String(value || "").trim();
+        if (!clean) return "";
+        return clean.startsWith("http://") || clean.startsWith("https://") ? clean : `https://${clean}`;
+      }
+      function suggestUrlCorrection(value = "") {
+        const normalized = normalizeUrl(value);
+        if (!normalized || normalized.includes("{{")) return null;
+        let url;
+        try { url = new URL(normalized); } catch { return null; }
+        const fixes = {
+          "goolge.com": "google.com", "www.goolge.com": "www.google.com",
+          "gogle.com": "google.com", "www.gogle.com": "www.google.com",
+          "googel.com": "google.com", "www.googel.com": "www.google.com",
+          "gmial.com": "gmail.com", "www.gmial.com": "www.gmail.com",
+          "gnail.com": "gmail.com", "www.gnail.com": "www.gmail.com",
+        };
+        const fixed = fixes[url.hostname.toLowerCase()];
+        if (!fixed) return null;
+        url.hostname = fixed;
+        return url.toString();
+      }
+      function checkUrlBeforeUse(value, label) {
+        const suggestion = suggestUrlCorrection(value);
+        if (suggestion) throw new Error(`${label}: confira o endereco. Voce quis dizer ${suggestion}?`);
+      }
+      function validateLocalWorkflow() {
+        workflowFromSteps().steps.forEach((step, index) => {
+          if (step.type === "goto" && step.url) checkUrlBeforeUse(step.url, `Passo ${index + 1}`);
+        });
+        Object.entries(collectRunInputs()).forEach(([key, value]) => {
+          if (String(value).includes(".")) checkUrlBeforeUse(value, `Entrada ${key}`);
+        });
       }
       function visibleFieldsFor(type) {
         return new Set(["type", "timeout_ms", ...(stepFields[type] || [])]);
@@ -660,6 +730,17 @@
           run_command: () => [
             { type: "command_run", command: "python", args: ["--version"], output_name: "saida-comando", timeout_ms: 30000 },
           ],
+          site_login: () => {
+            ensureInput("site", "https://sistema.empresa.com.br");
+            ensureInput("usuario", "seu.usuario");
+            return [
+              { type: "goto", url: "{{site}}", timeout_ms: 30000 },
+              { type: "fill", target: { label: "Usuario" }, value: "{{usuario}}", timeout_ms: 30000 },
+              { type: "secret_fill", target: { label: "Senha" }, secret: "portal.password", timeout_ms: 30000 },
+              { type: "click", target: { role: "button", name: "Entrar" }, timeout_ms: 30000 },
+              { type: "screenshot", name: "apos-login-{{run_date}}", timeout_ms: 30000 },
+            ];
+          },
           open_site: () => {
             ensureInput("site", "https://example.com");
             return [
@@ -676,10 +757,22 @@
           ],
         };
         if (!templates[template]) return;
+        if (template === "desktop_notepad" && environment.desktop && !environment.desktop.available) {
+          setMessage("#robot-message", environment.desktop.message || "Controle do PC nao esta disponivel nesta sessao.", "bad");
+          return;
+        }
         visualSteps.push(...templates[template]());
         renderSteps();
         renderInputs();
         setMessage("#robot-message", "Modelo adicionado. Ajuste os campos e confira os passos.", "good");
+      }
+      async function quickStart(template) {
+        if (!selectedRobot) {
+          return setMessage("#project-message", "Crie ou selecione um robo primeiro. Depois escolha o modelo.", "bad");
+        }
+        const map = { site_login: "site_login", files: "local_report", desktop: "desktop_notepad" };
+        showStage("teach");
+        addTemplateSteps(map[template]);
       }
       function collectRunInputs() {
         const form = document.querySelector("#run-inputs");
@@ -720,7 +813,7 @@
       function renderSteps() {
         const container = document.querySelector("#steps");
         if (!visualSteps.length) {
-          container.innerHTML = '<div class="empty">Ainda nao ha passos. Use Iniciar ensino para navegador ou Ferramentas avancadas para arquivos, pastas e comandos locais.</div>';
+          container.innerHTML = '<div class="empty">Ainda nao ha passos. Use Gravar site para navegador ou Ferramentas avancadas para arquivos, pastas e comandos locais.</div>';
           syncJson();
           renderInputs();
           return;
@@ -780,6 +873,8 @@
               <div class="robot-actions">
                 <button class="secondary tiny" onclick="continueRobot(event, ${robot.id})">Continuar</button>
                 <button class="secondary tiny" onclick="reconfigureRobot(event, ${robot.id})">Reconfigurar</button>
+                <button class="secondary tiny" onclick="duplicateRobot(event, ${robot.id})">Criar copia</button>
+                <button class="secondary tiny" onclick="exportRobot(event, ${robot.id})">Baixar backup</button>
                 <button class="secondary tiny" onclick="activateRobot(event, ${robot.id})">Ativar</button>
                 <button class="tiny" ${robot.status === "active" ? "" : "disabled"} onclick="runRobotNow(event, ${robot.id})">Executar</button>
                 <button class="danger tiny" onclick="deleteRobot(event, ${robot.id})">Excluir</button>
@@ -788,6 +883,14 @@
           : '<div class="empty">Nenhum robo criado ainda.</div>';
         document.querySelector("#robot-list").innerHTML = content;
         document.querySelector("#teach-robot-list").innerHTML = content;
+        renderRunRobotFilter();
+      }
+      function renderRunRobotFilter() {
+        const select = document.querySelector("#run-filter-robot");
+        if (!select) return;
+        const current = select.value;
+        select.innerHTML = `<option value="">Todos</option>${robots.map((robot) => `<option value="${robot.id}">${esc(robot.name)}</option>`).join("")}`;
+        select.value = robots.some((robot) => String(robot.id) === current) ? current : "";
       }
       function renderSecretOptions() {
         const select = document.querySelector("#robot-secret-select");
@@ -843,6 +946,7 @@
       }
       async function saveWorkflow() {
         if (!selectedVersion) throw new Error("Selecione um robo.");
+        validateLocalWorkflow();
         selectedVersion = await api(`/robot-versions/${selectedVersion.id}`, { method: "PUT", body: JSON.stringify({ workflow: workflowFromSteps() }) });
         return selectedVersion;
       }
@@ -867,13 +971,65 @@
         if (!Number.isFinite(ms) || ms < 0) return "-";
         return `${Math.round(ms / 1000)}s`;
       }
+      function downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+      function filenameFromDisposition(header, fallback) {
+        const match = /filename="?([^"]+)"?/i.exec(header || "");
+        return match ? match[1] : fallback;
+      }
+      async function downloadFrom(path, fallback) {
+        const response = await apiResponse(path, { headers: { "Content-Type": "application/octet-stream" } });
+        if (!response.ok) throw new Error(`Erro HTTP ${response.status}`);
+        downloadBlob(await response.blob(), filenameFromDisposition(response.headers.get("Content-Disposition"), fallback));
+      }
       async function loadLogSummary() {
         const data = await api("/dashboard");
         const items = [["Robos", data.robots_total], ["Ativos", data.robots_active], ["Execucoes", data.runs_total], ["Sucesso", data.runs_success], ["Falhas", data.runs_failed], ["Agendas", data.schedules_enabled]];
         document.querySelector("#metrics").innerHTML = items.map(([label, value]) => `<div class="metric"><span>${label}</span><strong>${value}</strong></div>`).join("");
       }
-      async function loadRuns() { renderRunsTable("#runs-table", await api("/runs")); }
-      async function showRun(id) { document.querySelector("#run-detail").textContent = JSON.stringify(await api(`/runs/${id}`), null, 2); }
+      async function loadRuns() {
+        const params = new URLSearchParams();
+        const robotId = document.querySelector("#run-filter-robot")?.value;
+        const status = document.querySelector("#run-filter-status")?.value;
+        if (robotId) params.set("robot_id", robotId);
+        if (status) params.set("status", status);
+        const query = params.toString();
+        renderRunsTable("#runs-table", await api(`/runs${query ? `?${query}` : ""}`));
+      }
+      async function showRun(id) {
+        const run = await api(`/runs/${id}`);
+        const compact = { ...run };
+        delete compact.logs;
+        delete compact.artifacts;
+        const artifacts = run.artifacts?.length
+          ? run.artifacts.map((artifact) => {
+              return `
+                <div class="artifact-row">
+                  <span>${esc(artifact.path)} (${esc(artifact.kind)})</span>
+                  <button class="tiny" onclick="downloadArtifact(${artifact.id})">Baixar</button>
+                </div>`;
+            }).join("")
+          : "<p>Nenhum artefato nesta execucao.</p>";
+        document.querySelector("#run-detail").innerHTML = `
+          <h4>Execucao ${run.id} · ${esc(run.status)}</h4>
+          <pre>${esc(JSON.stringify(compact, null, 2))}</pre>
+          <h4>Linha do tempo</h4>
+          <pre>${esc((run.logs || []).map((item) => `${item.created_at} [${item.level}] ${item.message}`).join("\n") || "Sem logs.")}</pre>
+          <h4>Artefatos</h4>
+          ${artifacts}`;
+      }
+      async function downloadArtifact(id) {
+        try { await downloadFrom(`/artifacts/${id}`, `artefato-${id}`); }
+        catch (error) { alert(error.message); }
+      }
       async function loadSecrets() {
         secrets = await api("/secrets");
         document.querySelector("#secrets-table").innerHTML = `<tr><th>Nome</th><th>Tipo</th><th>Descricao</th></tr>${secrets.map((item) => `<tr><td>${esc(item.name)}</td><td>${esc(item.secret_type)}</td><td>${esc(item.description)}</td></tr>`).join("")}`;
@@ -885,16 +1041,42 @@
         document.querySelector("#schedules-table").innerHTML = html;
         document.querySelector("#schedules-table-full").innerHTML = html;
       }
+      async function loadEnvironment() {
+        environment = await api("/environment");
+        renderEnvironmentStatus();
+      }
+      function renderEnvironmentStatus() {
+        const desktop = environment.desktop || {};
+        const box = document.querySelector("#desktop-status");
+        if (!box) return;
+        box.textContent = desktop.available
+          ? "Controle do PC disponivel nesta sessao."
+          : desktop.message || "Controle do PC nao esta disponivel nesta sessao.";
+        box.classList.toggle("hidden", desktop.available);
+        box.classList.toggle("bad", !desktop.available);
+        document.querySelectorAll("[data-requires-desktop]").forEach((button) => {
+          button.disabled = !desktop.available;
+          button.title = desktop.available ? "" : box.textContent;
+        });
+      }
       async function refreshAll() {
-        await Promise.all([loadLogSummary(), loadRobots(), loadRuns(), loadSecrets(), loadSchedules()]);
+        await Promise.all([loadLogSummary(), loadRobots(), loadRuns(), loadSecrets(), loadSchedules(), loadEnvironment()]);
         document.querySelector("#api-status").textContent = "API conectada";
       }
       async function runSelected(headless, messageSelector = "#robot-message") {
         if (!selectedRobot) return setMessage(messageSelector, "Selecione um robo.", "bad");
         try {
+          validateLocalWorkflow();
           const run = await api(`/robots/${selectedRobot.id}/run`, { method: "POST", body: JSON.stringify({ inputs: collectRunInputs(), headless }) });
           setMessage(messageSelector, `Execucao ${run.id} iniciada. Acompanhe em Logs.`, "good");
           setTimeout(() => refreshAll().catch(() => {}), 1200);
+        } catch (error) { setMessage(messageSelector, error.message, "bad"); }
+      }
+      async function prepareAndRunSelected(headless, messageSelector = "#robot-message") {
+        if (!selectedRobot) return setMessage(messageSelector, "Selecione um robo.", "bad");
+        try {
+          await publishWorkflow();
+          await runSelected(headless, messageSelector);
         } catch (error) { setMessage(messageSelector, error.message, "bad"); }
       }
       async function continueRobot(event, id) {
@@ -926,6 +1108,34 @@
           await selectRobot(id);
           showStage("teach");
           setMessage("#robot-message", "Nova versao criada para reconfiguracao. Ajuste os passos e ative novamente.", "good");
+        } catch (error) { setMessage("#project-message", error.message, "bad"); }
+      }
+      async function duplicateRobot(event, id) {
+        event.stopPropagation();
+        try {
+          const robot = await api(`/robots/${id}/duplicate`, { method: "POST" });
+          await refreshAll();
+          await selectRobot(robot.id);
+          showStage("teach");
+          setMessage("#robot-message", "Copia criada. Confira os passos antes de ativar.", "good");
+        } catch (error) { setMessage("#project-message", error.message, "bad"); }
+      }
+      async function exportRobot(event, id) {
+        event.stopPropagation();
+        try {
+          await downloadFrom(`/robots/${id}/export`, `robo-${id}.json`);
+          setMessage("#project-message", "Backup baixado em JSON.", "good");
+        } catch (error) { setMessage("#project-message", error.message, "bad"); }
+      }
+      async function importRobotFile(file) {
+        if (!file) return;
+        try {
+          const payload = JSON.parse(await file.text());
+          const robot = await api("/robots/import", { method: "POST", body: JSON.stringify(payload) });
+          await refreshAll();
+          await selectRobot(robot.id);
+          showStage("teach");
+          setMessage("#robot-message", "Backup restaurado. Confira e ative quando estiver pronto.", "good");
         } catch (error) { setMessage("#project-message", error.message, "bad"); }
       }
       async function deleteRobot(event, id) {
@@ -1008,7 +1218,7 @@
           await refreshAll();
           await selectRobot(robot.id);
           showStage("teach");
-          setMessage("#robot-message", "Robo criado. Use Iniciar ensino para navegador ou Ferramentas avancadas para acoes locais.", "good");
+          setMessage("#robot-message", "Robo criado. Use Gravar site para navegador ou Ferramentas avancadas para acoes locais.", "good");
         } catch (error) { setMessage("#project-message", error.message, "bad"); }
       });
       document.querySelector("#create-demo").addEventListener("click", async () => {
@@ -1017,13 +1227,27 @@
           await refreshAll();
           await selectRobot(robot.id);
           showStage("teach");
-          setMessage("#robot-message", "Teste pronto. Confira os passos e clique em Testar agora.", "good");
+          setMessage("#robot-message", "Teste pronto. Confira os passos e clique em Salvar e testar.", "good");
         } catch (error) { setMessage("#project-message", error.message, "bad"); }
+      });
+      document.querySelector("#import-robot").addEventListener("click", () => document.querySelector("#import-robot-file").click());
+      document.querySelector("#import-robot-file").addEventListener("change", async (event) => {
+        await importRobotFile(event.target.files?.[0]);
+        event.target.value = "";
+      });
+      document.querySelector("#run-filter-robot").addEventListener("change", () => loadRuns().catch((error) => alert(error.message)));
+      document.querySelector("#run-filter-status").addEventListener("change", () => loadRuns().catch((error) => alert(error.message)));
+      document.querySelector("#clear-run-filters").addEventListener("click", () => {
+        document.querySelector("#run-filter-robot").value = "";
+        document.querySelector("#run-filter-status").value = "";
+        loadRuns().catch((error) => alert(error.message));
       });
       document.querySelector("#start-record").addEventListener("click", async () => {
         if (!selectedRobot) return setMessage("#robot-message", "Escolha ou crie um robo primeiro.", "bad");
         const url = document.querySelector("#record-url").value.trim();
         if (!url) return setMessage("#robot-message", "Informe o site inicial.", "bad");
+        try { checkUrlBeforeUse(url, "Site inicial"); }
+        catch (error) { return setMessage("#robot-message", error.message, "bad"); }
         if (activeRecording) return;
         try {
           activeRecording = await api(`/robots/${selectedRobot.id}/teach/start`, { method: "POST", body: JSON.stringify({ url }) });
@@ -1078,8 +1302,8 @@
           setMessage("#execution-message", "Ensino aprovado. Agora escolha quando o robo deve trabalhar.", "good");
         } catch (error) { setMessage("#robot-message", error.message, "bad"); }
       });
-      document.querySelector("#run-visible").addEventListener("click", () => runSelected(false));
-      document.querySelector("#run-headless").addEventListener("click", () => runSelected(true, "#execution-message"));
+      document.querySelector("#run-visible").addEventListener("click", () => prepareAndRunSelected(false));
+      document.querySelector("#run-headless").addEventListener("click", () => prepareAndRunSelected(true, "#execution-message"));
       document.querySelector("#step-form").addEventListener("submit", (event) => {
         event.preventDefault();
         const data = Object.fromEntries(new FormData(event.target).entries());

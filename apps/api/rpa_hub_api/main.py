@@ -3,20 +3,24 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from datetime import datetime
 from hmac import compare_digest
+import json
 from pathlib import Path
 from typing import AsyncIterator
 
+from apscheduler.triggers.cron import CronTrigger
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from apps.api.rpa_hub_api.auth import require_api_key
 from apps.api.rpa_hub_api.schemas import (
+    ArtifactOut,
     DashboardOut,
     GuidedRobotCreate,
     RobotCreate,
     RobotDelete,
+    RobotImport,
     RobotOut,
     RobotSecretAttach,
     RobotSecretOut,
@@ -46,9 +50,10 @@ from domain.schedules import ScheduleRepository
 from domain.secrets import SecretStore
 from domain.workers import WorkerRepository
 from infra.db import SessionLocal, init_db
-from infra.db.models import AuditEvent, Robot, RobotSecret, RobotVersion, Run, Schedule, Secret, Worker
+from infra.db.models import Artifact, AuditEvent, Robot, RobotSecret, RobotVersion, Run, Schedule, Secret, Worker
 from infra.scheduler import HubScheduler
 from infra.settings import settings
+from rpa_core.desktop.controller import desktop_environment_status
 from rpa_core.engine.validation import validate_workflow
 from rpa_core.recorder import RecorderManager, record_browser_session
 from rpa_core.variables import normalize_url
@@ -101,6 +106,11 @@ def health(session: Session = Depends(get_session)) -> dict[str, str]:
     except Exception:
         return {"status": "degraded", "database": "error"}
     return {"status": "ok", "version": app.version}
+
+
+@app.get("/environment")
+def environment() -> dict[str, dict[str, str | bool]]:
+    return {"desktop": desktop_environment_status()}
 
 
 @app.post("/robots", response_model=RobotOut)
@@ -158,11 +168,8 @@ def create_guided_robot(payload: GuidedRobotCreate, session: Session = Depends(g
 def list_robots(session: Session = Depends(get_session)):
     repo = RobotRepository(session)
     robots = repo.list_robots()
-    output = []
-    for robot in robots:
-        latest = repo.latest_version(robot.id)
-        output.append(_robot_out(robot, latest.id if latest else None))
-    return output
+    latest_by_robot = repo.latest_versions()
+    return [_robot_out(robot, latest_by_robot[robot.id].id if robot.id in latest_by_robot else None) for robot in robots]
 
 
 @app.get("/robots/{robot_id}", response_model=RobotOut)
@@ -229,6 +236,68 @@ def create_version(robot_id: int, payload: WorkflowUpdate | None = None, session
     audit(session, "version.created", "robot_version", version.id, {"robot_id": robot_id, "version": version.version})
     session.commit()
     return version
+
+
+@app.post("/robots/{robot_id}/duplicate", response_model=RobotOut)
+def duplicate_robot(robot_id: int, session: Session = Depends(get_session)):
+    repo = RobotRepository(session)
+    robot = repo.duplicate_robot(robot_id)
+    if not robot:
+        raise HTTPException(status_code=404, detail="Robo nao encontrado.")
+    latest = repo.latest_version(robot.id)
+    audit(session, "robot.duplicated", "robot", robot.id, {"source_robot_id": robot_id, "name": robot.name})
+    session.commit()
+    return _robot_out(robot, latest.id if latest else None)
+
+
+@app.get("/robots/{robot_id}/export")
+def export_robot(robot_id: int, session: Session = Depends(get_session)):
+    repo = RobotRepository(session)
+    robot = repo.get_robot(robot_id)
+    if not robot:
+        raise HTTPException(status_code=404, detail="Robo nao encontrado.")
+    version = repo.latest_published_version(robot_id) or repo.latest_version(robot_id)
+    payload = {
+        "name": robot.name,
+        "description": robot.description,
+        "start_url": robot.start_url,
+        "workflow": version.workflow if version else {"inputs": {}, "steps": []},
+        "exported_from": f"HUB RPA {app.version}",
+    }
+    audit(session, "robot.exported", "robot", robot_id, {"version_id": version.id if version else None})
+    session.commit()
+    safe_name = "".join(char if char.isalnum() or char in "-_" else "-" for char in robot.name.lower()).strip("-")
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="robo-{safe_name or robot_id}.json"'},
+    )
+
+
+@app.post("/robots/import", response_model=RobotOut)
+def import_robot(payload: RobotImport, session: Session = Depends(get_session)):
+    errors = validate_workflow(payload.workflow, settings.max_step_timeout_ms)
+    if errors:
+        raise HTTPException(status_code=400, detail={"message": "Workflow do robo importado e invalido.", "errors": errors})
+    name = payload.name
+    suffix = 1
+    if session.scalar(select(Robot.id).where(Robot.name == name)):
+        name = f"{name} (importado)"
+    while session.scalar(select(Robot.id).where(Robot.name == name)):
+        suffix += 1
+        name = f"{payload.name} (importado {suffix})"
+    repo = RobotRepository(session)
+    robot = repo.create_robot_with_workflow(
+        name=name,
+        workflow=payload.workflow,
+        description=payload.description,
+        start_url=payload.start_url,
+        publish=False,
+    )
+    latest = repo.latest_version(robot.id)
+    audit(session, "robot.imported", "robot", robot.id, {"name": robot.name})
+    session.commit()
+    return _robot_out(robot, latest.id if latest else None)
 
 
 @app.get("/robots/{robot_id}/versions/latest", response_model=VersionOut)
@@ -309,16 +378,36 @@ def run_robot(robot_id: int, payload: RunCreate, background_tasks: BackgroundTas
 
 
 @app.get("/runs", response_model=list[RunOut])
-def list_runs(limit: int = 50, session: Session = Depends(get_session)):
-    return [_run_out(run) for run in RunService(session, BASE_DIR, ARTIFACTS_DIR).list_runs(limit)]
+def list_runs(
+    limit: int = 50,
+    robot_id: int | None = None,
+    status: str | None = None,
+    session: Session = Depends(get_session),
+):
+    service = RunService(session, BASE_DIR, ARTIFACTS_DIR)
+    return [_run_out(run) for run in service.list_runs(limit, robot_id=robot_id, status=status)]
 
 
 @app.get("/runs/{run_id}", response_model=RunOut)
 def get_run(run_id: int, session: Session = Depends(get_session)):
-    run = session.get(Run, run_id)
+    run = session.get(Run, run_id, options=(selectinload(Run.steps), selectinload(Run.artifacts)))
     if not run:
         raise HTTPException(status_code=404, detail="Execucao nao encontrada.")
     return _run_out(run)
+
+
+@app.get("/artifacts/{artifact_id}")
+def download_artifact(artifact_id: int, session: Session = Depends(get_session)) -> FileResponse:
+    artifact = session.get(Artifact, artifact_id)
+    if artifact is None:
+        raise HTTPException(status_code=404, detail="Artefato nao encontrado.")
+    path = (BASE_DIR / artifact.path).resolve()
+    artifacts_root = ARTIFACTS_DIR.resolve()
+    if artifacts_root not in path.parents:
+        raise HTTPException(status_code=400, detail="Caminho de artefato invalido.")
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Arquivo de evidencia nao existe mais no disco.")
+    return FileResponse(path, filename=path.name)
 
 
 @app.post("/robots/{robot_id}/teach/finish", response_model=VersionOut)
@@ -485,6 +574,10 @@ def list_schedules(session: Session = Depends(get_session)):
 def create_schedule(payload: ScheduleCreate, session: Session = Depends(get_session)):
     if RobotRepository(session).get_robot(payload.robot_id) is None:
         raise HTTPException(status_code=404, detail="Robo nao encontrado.")
+    try:
+        CronTrigger.from_crontab(payload.cron)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"Programacao cron invalida: {exc}") from exc
     schedule = ScheduleRepository(session).create(payload.robot_id, payload.name, payload.cron, payload.inputs, payload.enabled)
     audit(session, "schedule.created", "schedule", schedule.id, {"robot_id": schedule.robot_id})
     session.commit()
@@ -552,7 +645,7 @@ def _run_out(run: Run) -> RunOut:
         started_at=run.started_at,
         finished_at=run.finished_at,
         logs=[{"level": step.level, "message": step.message, "data": step.data, "created_at": step.created_at.isoformat()} for step in run.steps],
-        artifacts=[artifact.path for artifact in run.artifacts],
+        artifacts=[ArtifactOut(id=artifact.id, path=artifact.path, kind=artifact.kind) for artifact in run.artifacts],
     )
 
 

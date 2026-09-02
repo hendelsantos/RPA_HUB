@@ -48,6 +48,13 @@ class RobotUpdate(BaseModel):
     status: str | None = None
 
 
+class RobotImport(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    description: str = ""
+    start_url: str | None = None
+    workflow: dict[str, Any]
+
+
 class RobotDelete(BaseModel):
     password: str = ""
 
@@ -75,6 +82,12 @@ class RunCreate(BaseModel):
     headless: bool = False
 
 
+class ArtifactOut(BaseModel):
+    id: int
+    path: str
+    kind: str
+
+
 class RunOut(BaseModel):
     id: int
     robot_id: int
@@ -86,7 +99,7 @@ class RunOut(BaseModel):
     started_at: datetime | None
     finished_at: datetime | None
     logs: list[dict[str, Any]]
-    artifacts: list[str]
+    artifacts: list[ArtifactOut]
 
 
 class DashboardOut(BaseModel):

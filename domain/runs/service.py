@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy import desc, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from domain.robots import RobotRepository
 from domain.secrets import SecretStore
@@ -21,8 +21,13 @@ class RunService:
         self.base_dir = base_dir
         self.artifacts_dir = artifacts_dir
 
-    def list_runs(self, limit: int = 50) -> list[Run]:
-        stmt = select(Run).order_by(desc(Run.created_at)).limit(limit)
+    def list_runs(self, limit: int = 50, robot_id: int | None = None, status: str | None = None) -> list[Run]:
+        stmt = select(Run).options(selectinload(Run.steps), selectinload(Run.artifacts))
+        if robot_id is not None:
+            stmt = stmt.where(Run.robot_id == robot_id)
+        if status:
+            stmt = stmt.where(Run.status == status.upper())
+        stmt = stmt.order_by(desc(Run.created_at)).limit(limit)
         return list(self.session.scalars(stmt))
 
     def create_run(self, robot_id: int, inputs: dict[str, Any]) -> Run:
@@ -88,4 +93,13 @@ class RunService:
         message = str(exc)
         if "Executable doesn't exist" in message and "playwright install" in message:
             return "Navegador do Playwright nao instalado. Rode no terminal: playwright install chromium"
+        if "ERR_CERT_COMMON_NAME_INVALID" in message:
+            return "O site abriu com certificado invalido. Confira se o endereco esta correto; por exemplo, google.com e diferente de goolge.com."
+        if "net::ERR_NAME_NOT_RESOLVED" in message or "net::ERR_CONNECTION" in message:
+            return "Nao foi possivel abrir o site. Confira o endereco e a conexao antes de executar novamente."
+        if "Can't connect to display" in message or "Authorization required" in message:
+            return (
+                "Controle do PC nao esta disponivel nesta sessao. Abra o Hub pela mesma tela grafica do usuario "
+                "ou configure DISPLAY/XAUTHORITY. Para sites, use os passos de navegador."
+            )
         return message

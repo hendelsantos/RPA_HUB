@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from rpa_core.engine.models import WorkflowDefinition
 from rpa_core.engine.sandbox import DEFAULT_MAX_STEP_TIMEOUT_MS
+from rpa_core.variables import suggest_url_correction
 
 
 TARGET_STEPS = {"click", "fill", "secret_fill", "select", "press", "wait_for", "assert_text", "download"}
@@ -38,6 +39,10 @@ def validate_workflow(
             errors.append(f"{prefix}: retry deve ser no maximo {MAX_RETRY}.")
         if step.type == "goto" and not step.url:
             errors.append(f"{prefix}: informe a URL.")
+        if step.type == "goto" and step.url:
+            suggestion = suggest_url_correction(step.url)
+            if suggestion:
+                errors.append(f"{prefix}: confira a URL. Voce quis dizer {suggestion}?")
         if step.type in TARGET_STEPS and step.target is None:
             errors.append(f"{prefix}: informe como encontrar o elemento.")
         if step.type == "fill" and step.value is None:

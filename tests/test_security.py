@@ -35,6 +35,10 @@ def test_public_endpoints_do_not_require_key(anon_client):
     assert health.status_code == 200
     assert health.json()["status"] == "ok"
 
+    environment = anon_client.get("/environment")
+    assert environment.status_code == 200
+    assert "available" in environment.json()["desktop"]
+
     web = anon_client.get("/")
     assert web.status_code == 200
     assert "HUB RPA" in web.text

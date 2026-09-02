@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import delete, desc, select, update
+from sqlalchemy import delete, desc, func, select, update
 from sqlalchemy.orm import Session
 
 from infra.db.models import Artifact, Robot, RobotSecret, RobotVersion, Run, RunStep, Schedule
@@ -74,6 +74,29 @@ class RobotRepository:
             .limit(1)
         )
         return self.session.scalar(stmt)
+
+    def latest_versions(self) -> dict[int, RobotVersion]:
+        stmt = select(RobotVersion).where(
+            RobotVersion.id.in_(select(func.max(RobotVersion.id)).group_by(RobotVersion.robot_id))
+        )
+        return {version.robot_id: version for version in self.session.scalars(stmt)}
+
+    def duplicate_robot(self, robot_id: int) -> Robot | None:
+        robot = self.get_robot(robot_id)
+        if robot is None:
+            return None
+        source = self.latest_published_version(robot_id) or self.latest_version(robot_id)
+        workflow = source.workflow if source else {"inputs": {}, "steps": []}
+        name = f"{robot.name} (copia)"
+        while self.session.scalar(select(Robot.id).where(Robot.name == name)):
+            name = f"{name} (copia)"
+        return self.create_robot_with_workflow(
+            name=name,
+            workflow=workflow,
+            description=robot.description,
+            start_url=robot.start_url,
+            publish=bool(self.latest_published_version(robot_id)),
+        )
 
     def latest_published_version(self, robot_id: int) -> RobotVersion | None:
         stmt = (

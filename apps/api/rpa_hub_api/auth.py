@@ -9,7 +9,7 @@ from infra.settings import settings
 
 
 LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
-PUBLIC_PATHS = {"/", "/health", "/docs", "/redoc", "/openapi.json"}
+PUBLIC_PATHS = {"/", "/health", "/environment", "/docs", "/redoc", "/openapi.json"}
 
 api_key_header = APIKeyHeader(
     name="X-API-Key",
