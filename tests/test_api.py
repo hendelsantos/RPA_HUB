@@ -123,6 +123,30 @@ def test_activate_robot_publishes_latest_valid_training():
         assert client.get(f"/robots/{robot['id']}").json()["status"] == "active"
 
 
+def test_local_automation_robot_does_not_require_start_url():
+    workflow = {
+        "inputs": {},
+        "steps": [
+            {"type": "file_create_folder", "path": "/tmp/rpa-hub-teste"},
+            {"type": "file_write_text", "path": "/tmp/rpa-hub-teste/status.txt", "value": "ok", "overwrite": True},
+        ],
+    }
+
+    with TestClient(app) as client:
+        robot_response = client.post("/robots", json={"name": "Robo local", "description": "Automacao sem site"})
+
+        assert robot_response.status_code == 200
+        robot = robot_response.json()
+        assert robot["start_url"] is None
+
+        version_response = client.post(f"/robots/{robot['id']}/versions", json={"workflow": workflow})
+        assert version_response.status_code == 200
+
+        activate = client.post(f"/robots/{robot['id']}/activate")
+        assert activate.status_code == 200
+        assert activate.json()["status"] == "published"
+
+
 def test_run_executes_the_version_that_was_queued(monkeypatch, tmp_path):
     captured_workflows = []
 

@@ -175,8 +175,8 @@
                     <label>Descreva a finalidade</label>
                     <input name="custom_purpose" placeholder="Exemplo: comparar precos em dois sistemas" />
                   </div>
-                  <label>Site onde o trabalho comeca</label>
-                  <input name="start_url" type="url" required placeholder="https://sistema.empresa.com.br" />
+                  <label>Site inicial, se usar navegador</label>
+                  <input name="start_url" type="url" placeholder="https://sistema.empresa.com.br" />
                   <label>Detalhes do objetivo</label>
                   <textarea name="description" placeholder="Exemplo: entrar no menu Vendas, filtrar ontem e baixar em Excel"></textarea>
                   <div class="toolbar end"><button>Criar e continuar</button></div>
@@ -206,14 +206,14 @@
                   <div id="teach-box" class="teach-banner">
                     <div>
                       <strong id="teach-status-title">Pronto para aprender</strong>
-                      <p id="record-status">Ao iniciar, uma janela do Chromium sera aberta. Faca o trabalho uma vez e o HUB gravara os passos.</p>
+                      <p id="record-status">Use o ensino quando o robo precisar navegar em um site. Para arquivos, pastas e comandos, use Ferramentas avancadas.</p>
                     </div>
                     <div class="toolbar" style="margin:0">
                       <button id="start-record">Iniciar ensino</button>
                       <button id="stop-record" class="secondary" disabled>Finalizar ensino</button>
                     </div>
                   </div>
-                  <label>Site inicial</label>
+                  <label>Site inicial para gravacao no navegador</label>
                   <input id="record-url" type="url" placeholder="https://sistema..." />
                   <div class="panel-title" style="margin-top:20px">
                     <h3>O que o robo aprendeu</h3>
@@ -464,7 +464,7 @@
       function renderSteps() {
         const container = document.querySelector("#steps");
         if (!visualSteps.length) {
-          container.innerHTML = '<div class="empty">Ainda nao ha passos. Clique em "Iniciar ensino", realize o trabalho no Chromium e depois finalize.</div>';
+          container.innerHTML = '<div class="empty">Ainda nao ha passos. Use Iniciar ensino para navegador ou Ferramentas avancadas para arquivos, pastas e comandos locais.</div>';
           syncJson();
           return;
         }
@@ -623,14 +623,14 @@
         const data = Object.fromEntries(new FormData(event.target).entries());
         try {
           const purpose = data.purpose === "other" ? data.custom_purpose : data.purpose;
-          const robot = await api("/robots", { method: "POST", body: JSON.stringify({ name: data.name, start_url: data.start_url, description: `${purpose}. ${data.description || ""}`.trim() }) });
+          const robot = await api("/robots", { method: "POST", body: JSON.stringify({ name: data.name, start_url: data.start_url || null, description: `${purpose}. ${data.description || ""}`.trim() }) });
           event.target.reset();
           document.querySelector("#custom-purpose-field").classList.add("hidden");
           document.querySelector('[name="custom_purpose"]').required = false;
           await refreshAll();
           await selectRobot(robot.id);
           showStage("teach");
-          setMessage("#robot-message", "Robo criado. Agora clique em Iniciar ensino.", "good");
+          setMessage("#robot-message", "Robo criado. Use Iniciar ensino para navegador ou Ferramentas avancadas para acoes locais.", "good");
         } catch (error) { setMessage("#project-message", error.message, "bad"); }
       });
       document.querySelector("#create-demo").addEventListener("click", async () => {

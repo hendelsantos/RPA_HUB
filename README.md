@@ -83,16 +83,16 @@ python apps/worker/local_worker.py --hub http://127.0.0.1:8010 --name AUTO-01 --
 
 1. Abra http://127.0.0.1:8010.
 2. Entre em **Studio**.
-3. Em **1. Projeto do robo**, informe o nome, escolha a finalidade e indique o site inicial.
+3. Em **1. Projeto do robo**, informe o nome, escolha a finalidade e indique o site inicial somente se o robo usar navegador.
 4. Clique em **Criar e continuar**.
-5. Em **2. Ensinar**, clique em **Iniciar ensino**.
+5. Em **2. Ensinar**, clique em **Iniciar ensino** se precisar gravar um site.
 6. O HUB abre o Chromium. Faca o processo normalmente no site.
 7. Volte ao HUB e clique em **Finalizar ensino**.
 8. Confira os passos e clique em **Aprovar ensino**.
 9. Em **3. Execucao**, escolha se o robo sera manual, diario, de segunda a sexta ou executado a cada hora.
 10. Salve a configuracao ou clique em **Executar em segundo plano**.
 
-Para aprender o fluxo sem cadastrar um site, use **Criar teste pronto** na primeira etapa. O JSON fica disponivel somente em **Ferramentas avancadas**.
+Para automacoes locais de Windows/Linux, nao precisa informar site. Adicione os passos em **Ferramentas avancadas**, aprove o ensino e execute quando quiser. Para aprender o fluxo sem cadastrar um site, use **Criar teste pronto** na primeira etapa.
 
 ## Executar um robo treinado depois
 
@@ -139,7 +139,7 @@ Crie um segredo chamado `portal.password` na tela Segredos. Depois use:
 
 ## Automacao do sistema operacional
 
-O mesmo robo tambem pode executar passos locais no Windows ou Linux:
+O mesmo robo tambem pode executar passos locais no Windows ou Linux sem precisar de site:
 
 - `file_create_folder`: cria uma pasta.
 - `file_write_text`: cria ou atualiza um arquivo de texto.
