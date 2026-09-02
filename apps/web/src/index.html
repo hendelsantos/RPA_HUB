@@ -237,11 +237,18 @@
                           <option value="wait_for">Esperar elemento</option><option value="assert_text">Validar texto</option>
                           <option value="download">Baixar arquivo</option><option value="screenshot">Tirar evidencia</option>
                           <option value="delay">Aguardar tempo</option>
+                          <option value="file_create_folder">Criar pasta</option><option value="file_copy">Copiar arquivo/pasta</option>
+                          <option value="file_move">Mover arquivo/pasta</option><option value="file_delete">Apagar arquivo/pasta</option>
+                          <option value="file_write_text">Criar arquivo texto</option>
                         </select></div>
                         <div><label>URL</label><input name="url" /></div>
                         <div><label>Como localizar</label><select name="target_kind"><option value="text">Texto visivel</option><option value="label">Rotulo do campo</option><option value="role">Botao por nome</option><option value="css">Seletor CSS</option></select></div>
                         <div><label>Elemento</label><input name="target_value" /></div>
                         <div><label>Valor</label><input name="value" /></div>
+                        <div><label>Caminho</label><input name="path" placeholder="C:\\Relatorios ou /home/usuario/relatorios" /></div>
+                        <div><label>Origem</label><input name="source" placeholder="Arquivo ou pasta de origem" /></div>
+                        <div><label>Destino</label><input name="destination" placeholder="Arquivo ou pasta de destino" /></div>
+                        <label class="choice"><input name="overwrite" type="checkbox" value="true" /><span>Sobrescrever se ja existir</span></label>
                         <div><label>Segredo</label><input name="secret" placeholder="portal.password" /></div>
                         <div><label>Arquivo</label><input name="filename" /></div>
                         <div><label>Tecla</label><input name="key" /></div>
@@ -354,6 +361,9 @@
         press: "Pressionar tecla", wait_for: "Esperar aparecer",
         assert_text: "Validar texto", download: "Baixar arquivo",
         screenshot: "Tirar evidencia", delay: "Aguardar tempo",
+        file_create_folder: "Criar pasta", file_copy: "Copiar arquivo/pasta",
+        file_move: "Mover arquivo/pasta", file_delete: "Apagar arquivo/pasta",
+        file_write_text: "Criar arquivo texto",
       };
 
       async function api(path, options = {}) {
@@ -399,8 +409,9 @@
           inputs: {},
           steps: visualSteps.map((step) => {
             const output = { type: step.type, timeout_ms: Number(step.timeout_ms || 30000) };
-            ["url", "value", "filename", "name", "secret", "key"].forEach((field) => { if (step[field]) output[field] = step[field]; });
+            ["url", "value", "filename", "name", "path", "source", "destination", "secret", "key"].forEach((field) => { if (step[field]) output[field] = step[field]; });
             if (step.target && Object.keys(step.target).length) output.target = step.target;
+            if (step.overwrite) output.overwrite = true;
             return output;
           }),
         };
@@ -410,6 +421,8 @@
         if (field === "target_kind" || field === "target_value") {
           const [kind, currentValue] = targetParts(visualSteps[index].target);
           visualSteps[index].target = targetFrom(field === "target_kind" ? value : kind, field === "target_value" ? value : currentValue);
+        } else if (field === "overwrite") {
+          visualSteps[index][field] = value === true || value === "true";
         } else {
           visualSteps[index][field] = field === "timeout_ms" ? Number(value) : value;
         }
@@ -449,6 +462,10 @@
                 <div><label>Como localizar</label><select onchange="updateStep(${index},'target_kind',this.value)"><option value="text" ${kind === "text" ? "selected" : ""}>Texto</option><option value="label" ${kind === "label" ? "selected" : ""}>Rotulo</option><option value="role" ${kind === "role" ? "selected" : ""}>Botao</option><option value="css" ${kind === "css" ? "selected" : ""}>CSS</option></select></div>
                 <div><label>Elemento</label><input value="${esc(targetValue)}" onchange="updateStep(${index},'target_value',this.value)" /></div>
                 <div><label>Valor</label><input value="${esc(step.value)}" onchange="updateStep(${index},'value',this.value)" /></div>
+                <div><label>Caminho</label><input value="${esc(step.path)}" onchange="updateStep(${index},'path',this.value)" /></div>
+                <div><label>Origem</label><input value="${esc(step.source)}" onchange="updateStep(${index},'source',this.value)" /></div>
+                <div><label>Destino</label><input value="${esc(step.destination)}" onchange="updateStep(${index},'destination',this.value)" /></div>
+                <label class="choice"><input type="checkbox" ${step.overwrite ? "checked" : ""} onchange="updateStep(${index},'overwrite',this.checked)" /><span>Sobrescrever se ja existir</span></label>
                 <div><label>Arquivo ou segredo</label><input value="${esc(step.filename || step.name || step.secret)}" onchange="updateStep(${index},'${step.type === "secret_fill" ? "secret" : step.type === "screenshot" ? "name" : "filename"}',this.value)" /></div>
               </div>
             </div>`;
@@ -660,7 +677,8 @@
         const step = { type: data.type, timeout_ms: 30000 };
         if (data.url) step.url = data.url;
         if (data.target_value) step.target = targetFrom(data.target_kind, data.target_value);
-        ["value", "secret", "filename", "key"].forEach((field) => { if (data[field]) step[field] = data[field]; });
+        ["value", "path", "source", "destination", "secret", "filename", "key"].forEach((field) => { if (data[field]) step[field] = data[field]; });
+        if (data.overwrite === "true") step.overwrite = true;
         if (data.type === "screenshot" && data.filename) { step.name = data.filename; delete step.filename; }
         visualSteps.push(step);
         event.target.reset();

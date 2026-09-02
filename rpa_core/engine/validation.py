@@ -8,6 +8,8 @@ from rpa_core.engine.models import WorkflowDefinition
 
 
 TARGET_STEPS = {"click", "fill", "secret_fill", "select", "press", "wait_for", "assert_text", "download"}
+PATH_STEPS = {"file_create_folder", "file_delete", "file_write_text"}
+SOURCE_DESTINATION_STEPS = {"file_copy", "file_move"}
 
 
 def validate_workflow(workflow_data: dict[str, Any]) -> list[str]:
@@ -34,5 +36,13 @@ def validate_workflow(workflow_data: dict[str, Any]) -> list[str]:
             errors.append(f"{prefix}: informe a tecla.")
         if step.type == "download" and not step.filename:
             errors.append(f"{prefix}: informe o nome do arquivo.")
+        if step.type in PATH_STEPS and not step.path:
+            errors.append(f"{prefix}: informe o caminho.")
+        if step.type in SOURCE_DESTINATION_STEPS and not step.source:
+            errors.append(f"{prefix}: informe a origem.")
+        if step.type in SOURCE_DESTINATION_STEPS and not step.destination:
+            errors.append(f"{prefix}: informe o destino.")
+        if step.type == "file_write_text" and step.value is None:
+            errors.append(f"{prefix}: informe o texto.")
 
     return errors

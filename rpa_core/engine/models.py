@@ -17,6 +17,11 @@ StepType = Literal[
     "download",
     "screenshot",
     "delay",
+    "file_create_folder",
+    "file_copy",
+    "file_move",
+    "file_delete",
+    "file_write_text",
 ]
 
 
@@ -35,8 +40,12 @@ class WorkflowStep(BaseModel):
     value: str | None = None
     filename: str | None = None
     name: str | None = None
+    path: str | None = None
+    source: str | None = None
+    destination: str | None = None
     secret: str | None = None
     key: str | None = None
+    overwrite: bool = False
     timeout_ms: int = 30000
     retry: int = 0
     meta: dict[str, Any] = Field(default_factory=dict)

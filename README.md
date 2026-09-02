@@ -137,6 +137,33 @@ Crie um segredo chamado `portal.password` na tela Segredos. Depois use:
 }
 ```
 
+## Automacao do sistema operacional
+
+O mesmo robo tambem pode executar passos locais no Windows ou Linux:
+
+- `file_create_folder`: cria uma pasta.
+- `file_write_text`: cria ou atualiza um arquivo de texto.
+- `file_copy`: copia arquivo ou pasta.
+- `file_move`: move arquivo ou pasta.
+- `file_delete`: apaga arquivo ou pasta.
+
+Exemplo:
+
+```json
+{
+  "inputs": {
+    "cliente": "hmb"
+  },
+  "steps": [
+    { "type": "file_create_folder", "path": "C:\\RPA\\{{cliente}}" },
+    { "type": "file_write_text", "path": "C:\\RPA\\{{cliente}}\\status.txt", "value": "Processado", "overwrite": true },
+    { "type": "file_copy", "source": "C:\\Downloads\\relatorio.xlsx", "destination": "C:\\RPA\\{{cliente}}\\relatorio.xlsx", "overwrite": true }
+  ]
+}
+```
+
+No Linux, use caminhos como `/home/usuario/rpa/relatorio.xlsx`. Quando o fluxo tiver somente passos de arquivo/pasta, o Hub nao abre o navegador.
+
 ## Agendas
 
 As agendas usam cron de 5 campos:
