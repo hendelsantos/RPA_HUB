@@ -15,6 +15,8 @@ from apps.api.rpa_hub_api.schemas import (
     GuidedRobotCreate,
     RobotCreate,
     RobotOut,
+    RobotSecretAttach,
+    RobotSecretOut,
     RobotUpdate,
     RunCreate,
     RunOut,
@@ -41,7 +43,7 @@ from domain.schedules import ScheduleRepository
 from domain.secrets import SecretStore
 from domain.workers import WorkerRepository
 from infra.db import SessionLocal, init_db
-from infra.db.models import AuditEvent, Robot, RobotVersion, Run, Schedule, Secret, Worker
+from infra.db.models import AuditEvent, Robot, RobotSecret, RobotVersion, Run, Schedule, Secret, Worker
 from infra.scheduler import HubScheduler
 from rpa_core.engine.validation import validate_workflow
 from rpa_core.recorder import RecorderManager, record_browser_session
@@ -387,6 +389,49 @@ def create_secret(payload: SecretCreate, session: Session = Depends(get_session)
     return _secret_out(secret)
 
 
+@app.get("/robots/{robot_id}/secrets", response_model=list[RobotSecretOut])
+def list_robot_secrets(robot_id: int, session: Session = Depends(get_session)):
+    if RobotRepository(session).get_robot(robot_id) is None:
+        raise HTTPException(status_code=404, detail="Robo nao encontrado.")
+    stmt = (
+        select(RobotSecret)
+        .where(RobotSecret.robot_id == robot_id)
+        .join(RobotSecret.secret)
+        .order_by(Secret.name)
+    )
+    return [_robot_secret_out(link) for link in session.scalars(stmt)]
+
+
+@app.post("/robots/{robot_id}/secrets", response_model=RobotSecretOut)
+def attach_robot_secret(robot_id: int, payload: RobotSecretAttach, session: Session = Depends(get_session)):
+    if RobotRepository(session).get_robot(robot_id) is None:
+        raise HTTPException(status_code=404, detail="Robo nao encontrado.")
+    secret = session.get(Secret, payload.secret_id)
+    if secret is None:
+        raise HTTPException(status_code=404, detail="Segredo nao encontrado.")
+    link = session.scalar(select(RobotSecret).where(RobotSecret.robot_id == robot_id, RobotSecret.secret_id == secret.id))
+    if link is None:
+        link = RobotSecret(robot_id=robot_id, secret_id=secret.id)
+        session.add(link)
+    link.alias = payload.alias
+    session.flush()
+    audit(session, "robot_secret.attached", "robot", robot_id, {"secret_id": secret.id, "secret_name": secret.name})
+    session.commit()
+    return _robot_secret_out(link)
+
+
+@app.delete("/robots/{robot_id}/secrets/{link_id}")
+def detach_robot_secret(robot_id: int, link_id: int, session: Session = Depends(get_session)):
+    link = session.get(RobotSecret, link_id)
+    if link is None or link.robot_id != robot_id:
+        raise HTTPException(status_code=404, detail="Credencial do robo nao encontrada.")
+    data = {"secret_id": link.secret_id}
+    session.delete(link)
+    audit(session, "robot_secret.detached", "robot", robot_id, data)
+    session.commit()
+    return {"ok": True}
+
+
 @app.get("/schedules", response_model=list[ScheduleOut])
 def list_schedules(session: Session = Depends(get_session)):
     return ScheduleRepository(session).list_schedules()
@@ -553,6 +598,19 @@ def _secret_out(secret: Secret) -> SecretOut:
         secret_type=secret.secret_type,
         created_at=secret.created_at,
         updated_at=secret.updated_at,
+    )
+
+
+def _robot_secret_out(link: RobotSecret) -> RobotSecretOut:
+    return RobotSecretOut(
+        id=link.id,
+        robot_id=link.robot_id,
+        secret_id=link.secret_id,
+        secret_name=link.secret.name,
+        alias=link.alias,
+        description=link.secret.description,
+        secret_type=link.secret.secret_type,
+        created_at=link.created_at,
     )
 
 

@@ -89,6 +89,35 @@ def test_operational_hub_endpoints():
         assert dashboard["schedules_enabled"] >= 1
 
 
+def test_robot_secret_links_hide_values_and_reference_secret_name():
+    with TestClient(app) as client:
+        robot = client.post("/robots", json={"name": "Robo com login"}).json()
+        secret = client.post(
+            "/secrets",
+            json={"name": "portal_hmb.senha", "value": "senha-real", "description": "Senha do portal"},
+        ).json()
+
+        attach_response = client.post(
+            f"/robots/{robot['id']}/secrets",
+            json={"secret_id": secret["id"], "alias": "Senha principal"},
+        )
+
+        assert attach_response.status_code == 200
+        linked = attach_response.json()
+        assert linked["secret_name"] == "portal_hmb.senha"
+        assert linked["alias"] == "Senha principal"
+        assert "value" not in linked
+        assert "encrypted_value" not in linked
+
+        list_response = client.get(f"/robots/{robot['id']}/secrets")
+        assert list_response.status_code == 200
+        assert list_response.json()[0]["secret_name"] == "portal_hmb.senha"
+
+        delete_response = client.delete(f"/robots/{robot['id']}/secrets/{linked['id']}")
+        assert delete_response.status_code == 200
+        assert client.get(f"/robots/{robot['id']}/secrets").json() == []
+
+
 def test_publish_requires_valid_workflow():
     with TestClient(app) as client:
         robot = client.post("/robots", json={"name": "Robo Incompleto"}).json()

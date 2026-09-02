@@ -123,7 +123,9 @@ Robos em `draft` ainda podem ser editados ou ensinados novamente. Robos `active`
 
 ## Exemplo com segredo
 
-Crie um segredo chamado `portal.password` na tela Segredos. Depois use:
+Crie um segredo chamado `portal.password` na tela **Segredos**. Depois selecione o robo em **Studio** e vincule esse segredo em **Credenciais deste robo**.
+
+No passo de login, use `secret_fill` referenciando o nome do segredo:
 
 ```json
 {
@@ -136,6 +138,8 @@ Crie um segredo chamado `portal.password` na tela Segredos. Depois use:
   ]
 }
 ```
+
+O valor da senha nao aparece no workflow, nos logs ou na tela. O robo guarda somente o nome do segredo, por exemplo `portal.password`, e o Hub busca o valor real apenas na hora da execucao.
 
 ## Automacao do sistema operacional
 

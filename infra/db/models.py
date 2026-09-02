@@ -24,6 +24,7 @@ class Robot(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     versions: Mapped[list[RobotVersion]] = relationship(back_populates="robot", cascade="all, delete-orphan")
+    secret_links: Mapped[list[RobotSecret]] = relationship(back_populates="robot", cascade="all, delete-orphan")
 
 
 class RobotVersion(Base):
@@ -126,6 +127,25 @@ class Secret(Base):
     encrypted_value: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    robot_links: Mapped[list[RobotSecret]] = relationship(back_populates="secret", cascade="all, delete-orphan")
+
+
+class RobotSecret(Base):
+    __tablename__ = "robot_secrets"
+    __table_args__ = (
+        UniqueConstraint("robot_id", "secret_id", name="uq_robot_secrets_robot_secret"),
+        Index("ix_robot_secrets_robot_id", "robot_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    robot_id: Mapped[int] = mapped_column(ForeignKey("robots.id"), nullable=False)
+    secret_id: Mapped[int] = mapped_column(ForeignKey("secrets.id"), nullable=False)
+    alias: Mapped[str] = mapped_column(String(180), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    robot: Mapped[Robot] = relationship(back_populates="secret_links")
+    secret: Mapped[Secret] = relationship(back_populates="robot_links")
 
 
 class Schedule(Base):

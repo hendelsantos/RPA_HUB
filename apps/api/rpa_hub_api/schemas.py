@@ -134,6 +134,22 @@ class SecretOut(BaseModel):
     updated_at: datetime | None
 
 
+class RobotSecretAttach(BaseModel):
+    secret_id: int
+    alias: str = ""
+
+
+class RobotSecretOut(BaseModel):
+    id: int
+    robot_id: int
+    secret_id: int
+    secret_name: str
+    alias: str
+    description: str
+    secret_type: str
+    created_at: datetime
+
+
 class ScheduleCreate(BaseModel):
     robot_id: int
     name: str

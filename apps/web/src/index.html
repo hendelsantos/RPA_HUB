@@ -275,6 +275,18 @@
                   <p>O ensino sera salvo no robo selecionado.</p>
                 </div>
                 <div class="robot-list" id="teach-robot-list"></div>
+                <div class="panel-title" style="margin-top:20px">
+                  <h3>Credenciais deste robo</h3>
+                  <p>Vincule segredos ja cadastrados para usar em passos de login.</p>
+                </div>
+                <form id="robot-secret-form">
+                  <label>Segredo salvo</label>
+                  <select name="secret_id" id="robot-secret-select"></select>
+                  <label>Apelido opcional</label>
+                  <input name="alias" placeholder="Senha do portal" />
+                  <div class="toolbar end"><button>Vincular</button></div>
+                </form>
+                <div class="robot-list" id="robot-secret-list"></div>
               </div>
             </div>
           </div>
@@ -358,6 +370,8 @@
 
     <script>
       let robots = [];
+      let secrets = [];
+      let robotSecrets = [];
       let selectedRobot = null;
       let selectedVersion = null;
       let visualSteps = [];
@@ -519,11 +533,47 @@
         document.querySelector("#robot-list").innerHTML = content;
         document.querySelector("#teach-robot-list").innerHTML = content;
       }
+      function renderSecretOptions() {
+        const select = document.querySelector("#robot-secret-select");
+        if (!select) return;
+        select.innerHTML = secrets.length
+          ? secrets.map((secret) => `<option value="${secret.id}">${esc(secret.name)}</option>`).join("")
+          : '<option value="">Cadastre um segredo primeiro</option>';
+      }
+      function renderRobotSecrets() {
+        const container = document.querySelector("#robot-secret-list");
+        if (!container) return;
+        if (!selectedRobot) {
+          container.innerHTML = '<div class="empty">Selecione um robo.</div>';
+          return;
+        }
+        container.innerHTML = robotSecrets.length
+          ? robotSecrets.map((item) => `
+            <div class="robot-card">
+              <strong>${esc(item.alias || item.secret_name)}</strong>
+              <small>${esc(item.secret_name)} · ${esc(item.description || item.secret_type)}</small>
+              <div class="robot-actions">
+                <button class="secondary tiny" onclick="useRobotSecret(event, ${item.id})">Usar no passo</button>
+                <button class="danger tiny" onclick="detachRobotSecret(event, ${item.id})">Remover</button>
+              </div>
+            </div>`).join("")
+          : '<div class="empty">Nenhuma credencial vinculada a este robo.</div>';
+      }
       async function loadRobots() { robots = await api("/robots"); renderRobotLists(); }
+      async function loadRobotSecrets() {
+        if (!selectedRobot) {
+          robotSecrets = [];
+          renderRobotSecrets();
+          return;
+        }
+        robotSecrets = await api(`/robots/${selectedRobot.id}/secrets`);
+        renderRobotSecrets();
+      }
       async function selectRobot(id) {
         selectedRobot = robots.find((robot) => robot.id === Number(id));
         if (!selectedRobot) return;
         selectedVersion = await api(`/robots/${id}/versions/latest`);
+        await loadRobotSecrets();
         visualSteps = (selectedVersion.workflow.steps || []).map((step) => ({ timeout_ms: 30000, ...step }));
         document.querySelector("#teach-title").textContent = selectedRobot.name;
         document.querySelector("#teach-meta").innerHTML = `${pill(selectedRobot.status)} ${pill(selectedVersion.status)} versao ${selectedVersion.version} · ${esc(selectedRobot.description)}`;
@@ -562,8 +612,9 @@
       async function loadRuns() { renderRunsTable("#runs-table", await api("/runs")); }
       async function showRun(id) { document.querySelector("#run-detail").textContent = JSON.stringify(await api(`/runs/${id}`), null, 2); }
       async function loadSecrets() {
-        const values = await api("/secrets");
-        document.querySelector("#secrets-table").innerHTML = `<tr><th>Nome</th><th>Tipo</th><th>Descricao</th></tr>${values.map((item) => `<tr><td>${esc(item.name)}</td><td>${esc(item.secret_type)}</td><td>${esc(item.description)}</td></tr>`).join("")}`;
+        secrets = await api("/secrets");
+        document.querySelector("#secrets-table").innerHTML = `<tr><th>Nome</th><th>Tipo</th><th>Descricao</th></tr>${secrets.map((item) => `<tr><td>${esc(item.name)}</td><td>${esc(item.secret_type)}</td><td>${esc(item.description)}</td></tr>`).join("")}`;
+        renderSecretOptions();
       }
       async function loadSchedules() {
         const values = await api("/schedules");
@@ -603,6 +654,22 @@
         event.stopPropagation();
         await selectRobot(id);
         await runSelected(true, "#project-message");
+      }
+      function useRobotSecret(event, linkId) {
+        event.stopPropagation();
+        const linkedSecret = robotSecrets.find((item) => item.id === Number(linkId));
+        if (!linkedSecret) return;
+        const secretInput = document.querySelector('#step-form [name="secret"]');
+        if (secretInput) secretInput.value = linkedSecret.secret_name;
+        setMessage("#robot-message", `Segredo ${linkedSecret.secret_name} pronto para usar no proximo passo.`, "good");
+      }
+      async function detachRobotSecret(event, linkId) {
+        event.stopPropagation();
+        if (!selectedRobot) return;
+        try {
+          await api(`/robots/${selectedRobot.id}/secrets/${linkId}`, { method: "DELETE" });
+          await loadRobotSecrets();
+        } catch (error) { setMessage("#robot-message", error.message, "bad"); }
       }
 
       document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => {
@@ -761,7 +828,20 @@
           await api("/secrets", { method: "POST", body: JSON.stringify(Object.fromEntries(new FormData(event.target).entries())) });
           event.target.reset();
           await loadSecrets();
+          await loadRobotSecrets();
         } catch (error) { alert(error.message); }
+      });
+      document.querySelector("#robot-secret-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!selectedRobot) return setMessage("#robot-message", "Selecione um robo.", "bad");
+        const data = Object.fromEntries(new FormData(event.target).entries());
+        if (!data.secret_id) return setMessage("#robot-message", "Cadastre um segredo primeiro.", "bad");
+        try {
+          await api(`/robots/${selectedRobot.id}/secrets`, { method: "POST", body: JSON.stringify({ secret_id: Number(data.secret_id), alias: data.alias || "" }) });
+          event.target.reset();
+          await loadRobotSecrets();
+          setMessage("#robot-message", "Credencial vinculada a este robo.", "good");
+        } catch (error) { setMessage("#robot-message", error.message, "bad"); }
       });
 
       renderSteps();
