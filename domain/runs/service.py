@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import asc, desc, func, select
 from sqlalchemy.orm import Session, selectinload
 
+from domain.monitoring import MonitoringService
 from domain.robots import RobotRepository
 from domain.secrets import SecretStore
 from domain.workers import WorkerRepository
@@ -170,6 +171,7 @@ class RunService:
                 path = str(artifact.relative_to(self.base_dir))
                 self.session.add(Artifact(run_id=run.id, path=path, kind=artifact.suffix.lstrip(".") or "file"))
             run.status = "SUCCESS"
+            MonitoringService(self.session).resolve_robot_alerts(run.robot_id)
         except WorkflowCancelledError as exc:
             run.status = "CANCELLED"
             run.error = str(exc)
@@ -192,6 +194,8 @@ class RunService:
                 )
             else:
                 run.finished_at = utc_now()
+                if run.status == "FAILED":
+                    MonitoringService(self.session).create_failure_alert(run)
             self.session.commit()
             self.session.refresh(run)
 

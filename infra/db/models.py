@@ -107,6 +107,26 @@ class Artifact(Base):
     run: Mapped[Run] = relationship(back_populates="artifacts")
 
 
+class Alert(Base):
+    __tablename__ = "alerts"
+    __table_args__ = (
+        Index("ix_alerts_status_created_at", "status", "created_at"),
+        Index("ix_alerts_robot_created_at", "robot_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    robot_id: Mapped[int] = mapped_column(ForeignKey("robots.id"), nullable=False)
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("runs.id"), nullable=True)
+    severity: Mapped[str] = mapped_column(String(40), default="error")
+    status: Mapped[str] = mapped_column(String(40), default="open")
+    title: Mapped[str] = mapped_column(String(220), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    notification_status: Mapped[str] = mapped_column(String(40), default="pending")
+    notification_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class Worker(Base):
     __tablename__ = "workers"
     __table_args__ = (

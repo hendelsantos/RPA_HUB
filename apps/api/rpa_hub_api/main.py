@@ -46,6 +46,7 @@ from apps.api.rpa_hub_api.schemas import (
     WorkflowValidationOut,
 )
 from domain.audit import audit
+from domain.monitoring import MonitoringService
 from domain.robots import RobotRepository
 from domain.runs import RunQueueDispatcher, RunService
 from domain.schedules import ScheduleRepository
@@ -534,6 +535,11 @@ def dashboard(session: Session = Depends(get_session)):
         schedules_enabled=session.scalar(select(func.count(Schedule.id)).where(Schedule.enabled.is_(True))) or 0,
         recent_runs=[_run_out(run) for run in runs],
     )
+
+
+@app.get("/monitoring")
+def monitoring(session: Session = Depends(get_session)):
+    return MonitoringService(session).summary()
 
 
 @app.get("/workers", response_model=list[WorkerOut])

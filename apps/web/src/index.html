@@ -174,6 +174,7 @@
         <button class="tab active" data-view="studio">Studio</button>
         <button class="tab" data-view="robot-panel">Robo</button>
         <button class="tab" data-view="logs">Logs</button>
+        <button class="tab" data-view="monitoring">Monitoramento</button>
         <button class="tab" data-view="secrets">Credenciais</button>
         <button class="tab" data-view="schedules">Agendas</button>
       </nav>
@@ -521,6 +522,37 @@
             <div class="table-wrap"><table class="table" id="runs-table"></table></div>
           </div>
           <div class="panel" style="margin-top:14px"><h3>Detalhe</h3><div id="run-detail" class="run-detail">Selecione uma execucao.</div></div>
+        </section>
+
+        <section id="monitoring" class="view">
+          <div class="metrics" id="monitoring-metrics"></div>
+          <div class="panel">
+            <div class="panel-title">
+              <h3>Resumo diario</h3>
+              <p id="daily-summary">Carregando monitoramento.</p>
+            </div>
+            <div class="toolbar"><button class="secondary" type="button" id="monitoring-refresh">Atualizar</button></div>
+          </div>
+          <div class="layout" style="margin-top:14px">
+            <div class="panel">
+              <div class="panel-title"><h3>Alertas abertos</h3><p>Falhas que ainda precisam de atencao.</p></div>
+              <div id="open-alerts" class="compact-list"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><h3>Robos para ajustar</h3><p>Priorizado pela quantidade de alertas abertos.</p></div>
+              <div id="robots-attention" class="compact-list"></div>
+            </div>
+          </div>
+          <div class="layout" style="margin-top:14px">
+            <div class="panel">
+              <div class="panel-title"><h3>Falhas recentes</h3><p>Ultimas execucoes com erro.</p></div>
+              <div class="table-wrap"><table class="table" id="recent-failures-table"></table></div>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><h3>Workers</h3><p>Maquinas conhecidas pelo Hub.</p></div>
+              <div class="table-wrap"><table class="table" id="workers-monitoring-table"></table></div>
+            </div>
+          </div>
         </section>
 
         <section id="secrets" class="view">
@@ -1255,6 +1287,34 @@
         const query = params.toString();
         renderRunsTable("#runs-table", await api(`/runs${query ? `?${query}` : ""}`));
       }
+      async function loadMonitoring() {
+        const data = await api("/monitoring");
+        const runs = data.runs_24h || {};
+        const items = [
+          ["Execucoes 24h", runs.total || 0],
+          ["Sucesso", runs.success || 0],
+          ["Falhas", runs.failed || 0],
+          ["Taxa sucesso", data.success_rate === null || data.success_rate === undefined ? "-" : `${data.success_rate}%`],
+          ["Tempo medio", data.average_duration_seconds === null || data.average_duration_seconds === undefined ? "-" : `${data.average_duration_seconds}s`],
+          ["Alertas", data.open_alerts?.length || 0],
+        ];
+        document.querySelector("#monitoring-metrics").innerHTML = items.map(([label, value]) => `<div class="metric"><span>${label}</span><strong>${value}</strong></div>`).join("");
+        document.querySelector("#daily-summary").textContent = data.daily_summary || "Sem resumo disponivel.";
+        document.querySelector("#open-alerts").innerHTML = data.open_alerts?.length
+          ? data.open_alerts.map((alert) => `
+            <div class="compact-item">
+              <strong>${esc(alert.title)}</strong>
+              <small>Run ${alert.run_id || "-"} · ${esc(alert.created_at)} · aviso ${esc(alert.notification_status || "-")}</small>
+              <small>${esc(alert.message || "")}</small>
+              <div class="toolbar" style="margin-top:8px"><button class="secondary tiny" onclick="openRobotPanel(event, ${alert.robot_id})">Abrir robo</button>${alert.run_id ? `<button class="secondary tiny" onclick="showRun(${alert.run_id}); activateTab('logs')">Ver logs</button>` : ""}</div>
+            </div>`).join("")
+          : '<div class="empty">Nenhum alerta aberto.</div>';
+        document.querySelector("#robots-attention").innerHTML = data.robots_needing_attention?.length
+          ? data.robots_needing_attention.map((robot) => `<div class="compact-item"><strong>${esc(robot.name)}</strong><small>${robot.open_alerts} alerta(s) aberto(s)</small><div class="toolbar" style="margin-top:8px"><button class="secondary tiny" onclick="openRobotPanel(event, ${robot.robot_id})">Abrir robo</button></div></div>`).join("")
+          : '<div class="empty">Nenhum robo precisa de ajuste agora.</div>';
+        document.querySelector("#recent-failures-table").innerHTML = `<tr><th>Run</th><th>Robo</th><th>Maquina</th><th>Quando</th><th>Erro</th></tr>${(data.recent_failures || []).map((run) => `<tr onclick="showRun(${run.id}); activateTab('logs')"><td>${run.id}</td><td>${run.robot_id}</td><td>${esc(run.worker_name || run.machine_id || "-")}</td><td>${esc(run.created_at || "-")}</td><td>${esc(run.error || "-")}</td></tr>`).join("")}`;
+        document.querySelector("#workers-monitoring-table").innerHTML = `<tr><th>Nome</th><th>Status</th><th>Heartbeat</th><th>Idade</th></tr>${(data.workers || []).map((worker) => `<tr><td>${esc(worker.name)}</td><td>${pill(worker.status)}</td><td>${esc(worker.last_heartbeat_at || "-")}</td><td>${worker.heartbeat_age_seconds === null || worker.heartbeat_age_seconds === undefined ? "-" : `${worker.heartbeat_age_seconds}s`}</td></tr>`).join("")}`;
+      }
       async function showRun(id) {
         const run = await api(`/runs/${id}`);
         const compact = { ...run };
@@ -1324,6 +1384,7 @@
       async function refreshAll() {
         await Promise.all([loadLogSummary(), loadRobots(), loadRuns(), loadSecrets(), loadSchedules(), loadEnvironment()]);
         if (document.querySelector("#robot-panel").classList.contains("active")) await loadRobotPanel();
+        if (document.querySelector("#monitoring").classList.contains("active")) await loadMonitoring();
         document.querySelector("#api-status").textContent = "API conectada";
       }
       async function loadRobotPanel() {
@@ -1578,6 +1639,9 @@
         if (view === "robot-panel") {
           await loadRobotPanel().catch((error) => setMessage("#robot-panel-message", error.message, "bad"));
         }
+        if (view === "monitoring") {
+          await loadMonitoring().catch((error) => alert(error.message));
+        }
       }
       document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => activateTab(tab.dataset.view)));
       document.querySelectorAll(".stage").forEach((stage) => stage.addEventListener("click", () => showStage(stage.dataset.stage)));
@@ -1677,6 +1741,7 @@
         await loadRobotPanel();
       });
       document.querySelector("#panel-refresh").addEventListener("click", () => loadRobotPanel().catch((error) => setMessage("#robot-panel-message", error.message, "bad")));
+      document.querySelector("#monitoring-refresh").addEventListener("click", () => loadMonitoring().catch((error) => alert(error.message)));
       document.querySelector("#start-record").addEventListener("click", async () => {
         if (!selectedRobot) return setMessage("#robot-message", "Escolha ou crie um robo primeiro.", "bad");
         const url = document.querySelector("#record-url").value.trim();

@@ -29,6 +29,7 @@ def init_db() -> None:
     _migrate_sqlite_runs_for_queue()
     _migrate_sqlite_runs_for_retry_and_worker()
     _migrate_sqlite_schedules_for_retry()
+    _migrate_sqlite_alerts()
     Base.metadata.create_all(bind=engine)
 
 
@@ -163,3 +164,36 @@ def _migrate_sqlite_schedules_for_retry() -> None:
         columns = {row[1] for row in connection.execute(text("PRAGMA table_info(schedules)"))}
         if "max_retries" not in columns:
             connection.execute(text("ALTER TABLE schedules ADD COLUMN max_retries INTEGER DEFAULT 0 NOT NULL"))
+
+
+def _migrate_sqlite_alerts() -> None:
+    if engine.dialect.name != "sqlite":
+        return
+    with engine.begin() as connection:
+        table_exists = connection.scalar(text("select 1 from sqlite_master where type='table' and name='alerts'"))
+        if table_exists:
+            return
+        connection.execute(
+            text(
+                """
+                CREATE TABLE alerts (
+                    id INTEGER NOT NULL,
+                    robot_id INTEGER NOT NULL,
+                    run_id INTEGER,
+                    severity VARCHAR(40) DEFAULT 'error' NOT NULL,
+                    status VARCHAR(40) DEFAULT 'open' NOT NULL,
+                    title VARCHAR(220) NOT NULL,
+                    message TEXT NOT NULL,
+                    notification_status VARCHAR(40) DEFAULT 'pending' NOT NULL,
+                    notification_error TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    resolved_at DATETIME,
+                    PRIMARY KEY (id),
+                    FOREIGN KEY(robot_id) REFERENCES robots (id),
+                    FOREIGN KEY(run_id) REFERENCES runs (id)
+                )
+                """
+            )
+        )
+        connection.execute(text("CREATE INDEX ix_alerts_status_created_at ON alerts (status, created_at)"))
+        connection.execute(text("CREATE INDEX ix_alerts_robot_created_at ON alerts (robot_id, created_at)"))

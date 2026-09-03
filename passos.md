@@ -145,18 +145,18 @@ Resultado esperado: operar cada robo em um lugar so.
 
 ## Fase 9 - Monitoramento e avisos
 
-Status: pendente.
+Status: iniciado.
 
 O HUB deve avisar quando algo der errado.
 
 Passos:
 
-1. Criar alertas de falha.
-2. Enviar aviso por email, Teams ou WhatsApp.
-3. Mostrar historico de sucesso e falha.
-4. Mostrar tempo medio de execucao.
-5. Mostrar quais robos precisam de ajuste.
-6. Criar resumo diario.
+1. Criar alertas de falha. **Iniciado.**
+2. Enviar aviso por email, Teams ou WhatsApp. **Iniciado por email SMTP.**
+3. Mostrar historico de sucesso e falha. **Iniciado.**
+4. Mostrar tempo medio de execucao. **Iniciado.**
+5. Mostrar quais robos precisam de ajuste. **Iniciado.**
+6. Criar resumo diario. **Iniciado.**
 
 Resultado esperado: nao precisar ficar olhando a tela para saber se deu certo.
 

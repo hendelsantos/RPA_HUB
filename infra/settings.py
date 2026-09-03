@@ -25,6 +25,12 @@ class Settings:
     allowed_roots: tuple[Path, ...] = field(default_factory=tuple)
     allowed_commands: tuple[str, ...] = field(default_factory=tuple)
     max_step_timeout_ms: int = DEFAULT_MAX_STEP_TIMEOUT_MS
+    alert_email_to: str | None = None
+    alert_email_from: str | None = None
+    alert_email_host: str | None = None
+    alert_email_port: int = 587
+    alert_email_username: str | None = None
+    alert_email_password_secret: str | None = None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -33,12 +39,22 @@ class Settings:
             max_timeout = int(env.get("RPA_HUB_MAX_STEP_TIMEOUT_MS", str(DEFAULT_MAX_STEP_TIMEOUT_MS)))
         except ValueError as exc:
             raise RuntimeError("RPA_HUB_MAX_STEP_TIMEOUT_MS deve ser um numero inteiro de milissegundos.") from exc
+        try:
+            alert_email_port = int(env.get("RPA_HUB_ALERT_EMAIL_PORT", "587"))
+        except ValueError as exc:
+            raise RuntimeError("RPA_HUB_ALERT_EMAIL_PORT deve ser um numero inteiro.") from exc
         return cls(
             api_key=env.get("RPA_HUB_API_KEY") or None,
             delete_password=env.get("RPA_HUB_DELETE_PASSWORD") or None,
             allowed_roots=tuple(Path(item).expanduser() for item in _parse_csv(env.get("RPA_HUB_ALLOWED_ROOTS"))),
             allowed_commands=_parse_csv(env.get("RPA_HUB_ALLOWED_COMMANDS")),
             max_step_timeout_ms=max_timeout,
+            alert_email_to=env.get("RPA_HUB_ALERT_EMAIL_TO") or None,
+            alert_email_from=env.get("RPA_HUB_ALERT_EMAIL_FROM") or env.get("RPA_HUB_ALERT_EMAIL_USERNAME") or None,
+            alert_email_host=env.get("RPA_HUB_ALERT_EMAIL_HOST") or None,
+            alert_email_port=alert_email_port,
+            alert_email_username=env.get("RPA_HUB_ALERT_EMAIL_USERNAME") or None,
+            alert_email_password_secret=env.get("RPA_HUB_ALERT_EMAIL_PASSWORD_SECRET") or None,
         )
 
 

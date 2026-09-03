@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from domain.robots import RobotRepository
 from domain.runs import RunQueueDispatcher, RunService
-from infra.db.models import Artifact, AuditEvent, RobotVersion, Run, RunStep
+from infra.db.models import Alert, Artifact, AuditEvent, RobotVersion, Run, RunStep
 from infra.db.session import SessionLocal
 from infra.time import utc_now
 from rpa_core.engine.executor import WorkflowExecutionError
@@ -362,6 +362,62 @@ def test_robot_panel_groups_operational_context(client):
     assert panel["schedules"][0]["name"] == "Painel diario"
     assert panel["secrets"][0]["alias"] == "senha.painel"
     assert panel["artifacts"][0]["path"] == "infra/artifacts/painel/saida.xlsx"
+
+
+def test_monitoring_alerts_failures_and_resolves_after_success(client, monkeypatch, tmp_path):
+    class BrokenWorkflowExecutor:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def run(self, workflow, inputs, log, should_cancel=None):
+            raise RuntimeError("Sistema externo fora do ar")
+
+    monkeypatch.setattr("domain.runs.service.WorkflowExecutor", BrokenWorkflowExecutor)
+
+    with SessionLocal() as session:
+        robot = RobotRepository(session).create_robot_with_workflow(
+            name="Robo monitorado",
+            workflow={"inputs": {}, "steps": [{"type": "goto", "url": "https://example.com"}]},
+            publish=True,
+        )
+        session.commit()
+        service = RunService(session, tmp_path, tmp_path / "artifacts")
+        failed_run = service.create_run(robot.id, {})
+        session.commit()
+        failed = service.execute_run(failed_run.id, headless=True)
+        robot_id = robot.id
+
+    assert failed.status == "FAILED"
+
+    monitoring = client.get("/monitoring")
+    assert monitoring.status_code == 200
+    payload = monitoring.json()
+    assert payload["runs_24h"]["failed"] >= 1
+    assert payload["average_duration_seconds"] is not None
+    assert any(alert["robot_id"] == robot_id and alert["notification_status"] == "not_configured" for alert in payload["open_alerts"])
+    assert any(item["robot_id"] == robot_id and item["open_alerts"] >= 1 for item in payload["robots_needing_attention"])
+    assert "Resumo das ultimas 24h" in payload["daily_summary"]
+
+    class HealthyWorkflowExecutor:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def run(self, workflow, inputs, log, should_cancel=None):
+            log("INFO", "Fluxo recuperado.", {"status": "SUCCESS"})
+            return []
+
+    monkeypatch.setattr("domain.runs.service.WorkflowExecutor", HealthyWorkflowExecutor)
+
+    with SessionLocal() as session:
+        service = RunService(session, tmp_path, tmp_path / "artifacts")
+        recovery_run = service.create_run(robot_id, {})
+        session.commit()
+        recovered = service.execute_run(recovery_run.id, headless=True)
+
+        open_alert = session.scalar(select(Alert).where(Alert.robot_id == robot_id, Alert.status == "open"))
+
+    assert recovered.status == "SUCCESS"
+    assert open_alert is None
 
 
 def test_download_artifact_returns_file(client, monkeypatch, tmp_path):

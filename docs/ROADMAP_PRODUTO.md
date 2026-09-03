@@ -34,6 +34,10 @@ de passos.
 Atualizacao da fase 8: foi criada a aba Robo com painel operacional consolidado, incluindo
 dados gerais, passos atuais, credenciais, ultima execucao, arquivos, agendas e acoes principais.
 
+Atualizacao da fase 9: foi criada a aba Monitoramento com alertas de falha, historico recente,
+tempo medio, taxa de sucesso, robos que precisam de ajuste, resumo diario e envio opcional por
+email SMTP quando configurado.
+
 ## Prioridade 1 - Usabilidade principal
 
 ### 1. Construtor visual de passos

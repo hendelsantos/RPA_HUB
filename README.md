@@ -18,6 +18,7 @@ Aplicacao de automacao robotica de processos para criar, versionar, executar e m
 - Workers cadastraveis por maquina, tags e heartbeat.
 - Agendas persistidas em SQLite com formato cron.
 - Auditoria de criacao, publicacao, execucao, credencial, worker e agenda.
+- Monitoramento com alertas de falha, resumo diario, historico, tempo medio e robos que precisam de ajuste.
 - Inicio do Modo Ensinar por gravacao assistida de navegador.
 - Gravador de navegador com seletores melhores, variaveis automaticas e senha como credencial.
 - Editor visual com resumo de cada passo e acoes para duplicar, mover e desativar sem apagar.
@@ -69,6 +70,16 @@ Comando manual equivalente:
 
 ```bash
 uvicorn apps.api.rpa_hub_api.main:app --host 127.0.0.1 --port 8010
+```
+
+Para enviar alertas por email, configure SMTP pelo ambiente:
+
+```bash
+RPA_HUB_ALERT_EMAIL_TO=destino@empresa.com \
+RPA_HUB_ALERT_EMAIL_HOST=smtp.empresa.com \
+RPA_HUB_ALERT_EMAIL_USERNAME=usuario@empresa.com \
+RPA_HUB_ALERT_EMAIL_PASSWORD_SECRET=nome.da.credencial.no.cofre \
+./start-linux.sh
 ```
 
 Acesse:
