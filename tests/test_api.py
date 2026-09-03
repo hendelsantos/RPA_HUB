@@ -362,6 +362,51 @@ def test_robot_panel_groups_operational_context(client):
     assert panel["schedules"][0]["name"] == "Painel diario"
     assert panel["secrets"][0]["alias"] == "senha.painel"
     assert panel["artifacts"][0]["path"] == "infra/artifacts/painel/saida.xlsx"
+    assert "readiness" in panel
+
+
+def test_robot_panel_readiness_points_to_missing_and_completed_items(client):
+    with SessionLocal() as session:
+        robot = RobotRepository(session).create_robot_with_workflow(
+            name="Robo pronto",
+            workflow={
+                "inputs": {},
+                "steps": [
+                    {"type": "goto", "url": "https://example.com"},
+                    {"type": "secret_fill", "target": {"label": "Senha"}, "secret": "portal.senha"},
+                    {"type": "screenshot", "name": "evidencia-{{run_date}}"},
+                ],
+            },
+            publish=True,
+        )
+        robot_id = robot.id
+        session.commit()
+
+    first = client.get(f"/robots/{robot_id}/panel").json()["readiness"]
+    assert first["ready"] is False
+    assert "portal.senha" in first["missing_secrets"]
+    assert any(check["code"] == "credentials" and check["ok"] is False for check in first["checks"])
+
+    secret = client.post("/secrets", json={"name": "portal.senha", "value": "senha"}).json()
+    client.post(f"/robots/{robot_id}/secrets", json={"secret_id": secret["id"], "alias": "portal.senha"})
+    client.post(
+        "/schedules",
+        json={"robot_id": robot_id, "name": "Operacao diaria", "cron": "0 7 * * 1-5", "inputs": {}, "enabled": True},
+    )
+
+    with SessionLocal() as session:
+        version = session.scalar(select(RobotVersion).where(RobotVersion.robot_id == robot_id))
+        run = Run(robot_id=robot_id, robot_version_id=version.id, status="SUCCESS", inputs={}, started_at=utc_now(), finished_at=utc_now())
+        session.add(run)
+        session.flush()
+        session.add(Artifact(run_id=run.id, path="infra/artifacts/pronto/evidencia.png", kind="png"))
+        session.commit()
+
+    readiness = client.get(f"/robots/{robot_id}/panel").json()["readiness"]
+    assert readiness["ready"] is True
+    assert readiness["score"] == 100
+    assert readiness["missing_secrets"] == []
+    assert readiness["stats"]["success_runs"] >= 1
 
 
 def test_monitoring_alerts_failures_and_resolves_after_success(client, monkeypatch, tmp_path):

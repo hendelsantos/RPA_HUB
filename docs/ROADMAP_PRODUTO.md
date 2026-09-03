@@ -38,6 +38,10 @@ Atualizacao da fase 9: foi criada a aba Monitoramento com alertas de falha, hist
 tempo medio, taxa de sucesso, robos que precisam de ajuste, resumo diario e envio opcional por
 email SMTP quando configurado.
 
+Atualizacao da fase 10: o painel do robo ganhou um check de pronto para uso real. Ele consolida
+passos, validacao, publicacao, credenciais, teste com sucesso, evidencias, agenda e alertas
+abertos para mostrar o que falta antes de operar sem acompanhamento.
+
 ## Prioridade 1 - Usabilidade principal
 
 ### 1. Construtor visual de passos

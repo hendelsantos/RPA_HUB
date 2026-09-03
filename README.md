@@ -19,6 +19,7 @@ Aplicacao de automacao robotica de processos para criar, versionar, executar e m
 - Agendas persistidas em SQLite com formato cron.
 - Auditoria de criacao, publicacao, execucao, credencial, worker e agenda.
 - Monitoramento com alertas de falha, resumo diario, historico, tempo medio e robos que precisam de ajuste.
+- Check de pronto para uso real no painel do robo, com pendencias de passos, credenciais, teste, agenda, evidencias e alertas.
 - Inicio do Modo Ensinar por gravacao assistida de navegador.
 - Gravador de navegador com seletores melhores, variaveis automaticas e senha como credencial.
 - Editor visual com resumo de cada passo e acoes para duplicar, mover e desativar sem apagar.

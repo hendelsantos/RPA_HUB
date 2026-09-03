@@ -1417,6 +1417,7 @@
               <div class="summary-item"><span>Status</span><strong>${pill(robot.status)}</strong></div>
               <div class="summary-item"><span>Versao atual</span><strong>${panel.latest_version ? `${panel.latest_version.version} · ${esc(panel.latest_version.status)}` : "-"}</strong></div>
               <div class="summary-item"><span>Passos ativos</span><strong>${activeSteps.length}/${steps.length}</strong></div>
+              <div class="summary-item"><span>Pronto para uso</span><strong>${panel.readiness ? `${panel.readiness.score}%` : "-"}</strong></div>
               <div class="summary-item"><span>Ultima execucao</span><strong>${latestRun ? pill(latestRun.status) : "-"}</strong></div>
             </div>
             <div class="toolbar">
@@ -1428,6 +1429,7 @@
               <button class="danger" onclick="deleteRobot(event, ${robot.id})">Excluir</button>
             </div>
           </div>
+          ${renderReadiness(panel.readiness)}
           <div class="layout" style="margin-top:14px">
             <div class="panel">
               <div class="panel-title"><h3>Passos atuais</h3><p>${activeSteps.length} passos ativos nesta versao.</p></div>
@@ -1468,6 +1470,20 @@
             <div class="panel-title"><h3>Historico recente</h3><p>Ultimas execucoes deste robo.</p></div>
             ${panel.recent_runs.length ? renderRunsMiniTable(panel.recent_runs) : '<div class="empty">Nenhuma execucao encontrada.</div>'}
           </div>`;
+      }
+      function renderReadiness(readiness) {
+        if (!readiness) return "";
+        const statusText = readiness.ready ? "Pronto para operar" : "Ajustes pendentes";
+        return `<div class="panel" style="margin-top:14px">
+          <div class="panel-title"><h3>Pronto para uso real</h3><p>${statusText} · ${readiness.score}%</p></div>
+          <div class="compact-list">
+            ${(readiness.checks || []).map((check) => `
+              <div class="compact-item">
+                <strong>${check.ok ? "OK" : "Pendente"} · ${esc(check.label)}</strong>
+                <small>${check.ok ? "Concluido." : esc(check.action || "Precisa de ajuste.")}</small>
+              </div>`).join("")}
+          </div>
+        </div>`;
       }
       function artifactRow(artifact) {
         return `<div class="compact-item"><strong>${esc(artifact.path)}</strong><small>Run ${artifact.run_id || "-"} · ${esc(artifact.kind)}</small><div class="toolbar" style="margin-top:8px"><button class="secondary tiny" onclick="downloadArtifact(${artifact.id})">Baixar</button></div></div>`;

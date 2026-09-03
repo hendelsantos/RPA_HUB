@@ -162,20 +162,20 @@ Resultado esperado: nao precisar ficar olhando a tela para saber se deu certo.
 
 ## Fase 10 - Mais forte que Power Automate no nosso uso
 
-Status: meta.
+Status: iniciado.
 
 Nao precisamos copiar tudo do Power Automate. Precisamos ser melhores no fluxo que importa.
 
 O HUB sera mais forte quando conseguir:
 
-1. Criar robo de sistema por perguntas.
-2. Aprender navegacao gravando o usuario.
-3. Usar credenciais com seguranca.
-4. Baixar arquivos com evidencia.
-5. Corrigir erros com sugestoes claras.
-6. Rodar em fila com workers.
-7. Integrar arquivos, Excel, email, API e banco.
-8. Ser simples para operador nao tecnico.
+1. Criar robo de sistema por perguntas. **Iniciado.**
+2. Aprender navegacao gravando o usuario. **Iniciado.**
+3. Usar credenciais com seguranca. **Iniciado.**
+4. Baixar arquivos com evidencia. **Iniciado.**
+5. Corrigir erros com sugestoes claras. **Iniciado.**
+6. Rodar em fila com workers. **Iniciado.**
+7. Integrar arquivos, Excel, email, API e banco. **Iniciado.**
+8. Ser simples para operador nao tecnico. **Iniciado com check de pronto para uso real.**
 
 ## Prioridade imediata
 

@@ -47,6 +47,7 @@ from apps.api.rpa_hub_api.schemas import (
 )
 from domain.audit import audit
 from domain.monitoring import MonitoringService
+from domain.readiness import RobotReadinessService
 from domain.robots import RobotRepository
 from domain.runs import RunQueueDispatcher, RunService
 from domain.schedules import ScheduleRepository
@@ -215,6 +216,7 @@ def get_robot_panel(robot_id: int, session: Session = Depends(get_session)):
         schedules=[_schedule_out(schedule) for schedule in schedules],
         secrets=[_robot_secret_out(link) for link in secret_links],
         artifacts=[_panel_artifact_out(artifact) for artifact in artifacts],
+        readiness=RobotReadinessService(session).build(robot, latest),
     )
 
 

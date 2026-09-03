@@ -133,6 +133,7 @@ class RobotPanelOut(BaseModel):
     schedules: list["ScheduleOut"]
     secrets: list["RobotSecretOut"]
     artifacts: list[PanelArtifactOut]
+    readiness: dict[str, Any]
 
 
 class WorkerRegister(BaseModel):
