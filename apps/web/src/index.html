@@ -103,6 +103,15 @@
       .metric { padding: 13px; }
       .metric span { color: var(--muted); display: block; font-size: 12px; }
       .metric strong { display: block; font-size: 23px; margin-top: 5px; }
+      .summary-grid { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(120px, 1fr)); margin-bottom: 14px; }
+      .summary-item { background: #f8fafb; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+      .summary-item span { color: var(--muted); display: block; font-size: 12px; }
+      .summary-item strong { display: block; font-size: 18px; margin-top: 5px; }
+      .compact-list { display: grid; gap: 8px; }
+      .compact-item { border-bottom: 1px solid var(--line); padding: 9px 0; }
+      .compact-item:last-child { border-bottom: 0; }
+      .compact-item strong { display: block; font-size: 13px; }
+      .compact-item small { color: var(--muted); display: block; font-size: 12px; line-height: 1.45; margin-top: 3px; }
       .filters { align-items: end; display: grid; gap: 10px; grid-template-columns: minmax(160px, 1fr) minmax(140px, 220px) auto; margin: 12px 0; }
       .table-wrap { overflow: auto; }
       .table { border-collapse: collapse; width: 100%; }
@@ -134,7 +143,7 @@
       .key-panel input { width: 100%; }
       .hidden { display: none !important; }
       @media (max-width: 1120px) {
-        .shell, .layout, .layout-left, .metrics { grid-template-columns: 1fr; }
+        .shell, .layout, .layout-left, .metrics, .summary-grid { grid-template-columns: 1fr; }
         nav { display: flex; flex-wrap: wrap; gap: 6px; }
         nav h1, nav p { width: 100%; }
         .tab { width: auto; }
@@ -163,6 +172,7 @@
         <h1>HUB RPA</h1>
         <p>Crie, ensine e programe seus robos.</p>
         <button class="tab active" data-view="studio">Studio</button>
+        <button class="tab" data-view="robot-panel">Robo</button>
         <button class="tab" data-view="logs">Logs</button>
         <button class="tab" data-view="secrets">Credenciais</button>
         <button class="tab" data-view="schedules">Agendas</button>
@@ -482,6 +492,21 @@
               </div>
             </div>
           </div>
+        </section>
+
+        <section id="robot-panel" class="view">
+          <div class="panel">
+            <div class="panel-title">
+              <h3>Painel do robo</h3>
+              <p>Escolha um robo para operar tudo em um so lugar.</p>
+            </div>
+            <div class="filters">
+              <div><label>Robo</label><select id="panel-robot-select"><option value="">Selecione</option></select></div>
+              <button class="secondary" type="button" id="panel-refresh">Atualizar</button>
+            </div>
+            <p class="message" id="robot-panel-message"></p>
+          </div>
+          <div id="robot-panel-content" style="margin-top:14px"></div>
         </section>
 
         <section id="logs" class="view">
@@ -1078,6 +1103,7 @@
               <small>${esc(robot.description || "Sem descricao")} · ${esc(robot.status)}</small>
               <div class="robot-actions">
                 <button class="secondary tiny" onclick="continueRobot(event, ${robot.id})">Continuar</button>
+                <button class="secondary tiny" onclick="openRobotPanel(event, ${robot.id})">Painel</button>
                 <button class="secondary tiny" onclick="reconfigureRobot(event, ${robot.id})">Reconfigurar</button>
                 <button class="secondary tiny" onclick="duplicateRobot(event, ${robot.id})">Criar copia</button>
                 <button class="secondary tiny" onclick="exportRobot(event, ${robot.id})">Baixar backup</button>
@@ -1090,6 +1116,14 @@
         document.querySelector("#robot-list").innerHTML = content;
         document.querySelector("#teach-robot-list").innerHTML = content;
         renderRunRobotFilter();
+        renderPanelRobotSelect();
+      }
+      function renderPanelRobotSelect() {
+        const select = document.querySelector("#panel-robot-select");
+        if (!select) return;
+        const current = selectedRobot?.id ? String(selectedRobot.id) : select.value;
+        select.innerHTML = `<option value="">Selecione</option>${robots.map((robot) => `<option value="${robot.id}">${esc(robot.name)}</option>`).join("")}`;
+        select.value = robots.some((robot) => String(robot.id) === current) ? current : "";
       }
       function renderRunRobotFilter() {
         const select = document.querySelector("#run-filter-robot");
@@ -1289,7 +1323,96 @@
       }
       async function refreshAll() {
         await Promise.all([loadLogSummary(), loadRobots(), loadRuns(), loadSecrets(), loadSchedules(), loadEnvironment()]);
+        if (document.querySelector("#robot-panel").classList.contains("active")) await loadRobotPanel();
         document.querySelector("#api-status").textContent = "API conectada";
+      }
+      async function loadRobotPanel() {
+        const container = document.querySelector("#robot-panel-content");
+        const select = document.querySelector("#panel-robot-select");
+        const robotId = select?.value || selectedRobot?.id;
+        if (!robotId) {
+          container.innerHTML = '<div class="empty">Selecione um robo para abrir o painel.</div>';
+          return;
+        }
+        const panel = await api(`/robots/${robotId}/panel`);
+        if (!selectedRobot || selectedRobot.id !== panel.robot.id) await selectRobot(panel.robot.id);
+        renderPanelRobotSelect();
+        renderRobotPanel(panel);
+      }
+      function renderRobotPanel(panel) {
+        const robot = panel.robot;
+        const workflow = panel.latest_version?.workflow || { inputs: {}, steps: [] };
+        const steps = workflow.steps || [];
+        const activeSteps = steps.filter((step) => !step.meta?.disabled);
+        const latestRun = panel.latest_run;
+        const latestArtifacts = latestRun?.artifacts || [];
+        document.querySelector("#robot-panel-content").innerHTML = `
+          <div class="panel">
+            <div class="panel-title">
+              <h3>${esc(robot.name)}</h3>
+              <p>${esc(robot.description || "Sem descricao.")}</p>
+            </div>
+            <div class="summary-grid">
+              <div class="summary-item"><span>Status</span><strong>${pill(robot.status)}</strong></div>
+              <div class="summary-item"><span>Versao atual</span><strong>${panel.latest_version ? `${panel.latest_version.version} · ${esc(panel.latest_version.status)}` : "-"}</strong></div>
+              <div class="summary-item"><span>Passos ativos</span><strong>${activeSteps.length}/${steps.length}</strong></div>
+              <div class="summary-item"><span>Ultima execucao</span><strong>${latestRun ? pill(latestRun.status) : "-"}</strong></div>
+            </div>
+            <div class="toolbar">
+              <button ${robot.status === "active" ? "" : "disabled"} onclick="panelRun(true)">Executar</button>
+              <button class="secondary" onclick="panelRun(false)">Testar visivel</button>
+              <button class="secondary" onclick="panelEdit()">Corrigir</button>
+              <button class="secondary" onclick="duplicateRobot(event, ${robot.id})">Criar copia</button>
+              <button class="secondary" onclick="exportRobot(event, ${robot.id})">Baixar backup</button>
+              <button class="danger" onclick="deleteRobot(event, ${robot.id})">Excluir</button>
+            </div>
+          </div>
+          <div class="layout" style="margin-top:14px">
+            <div class="panel">
+              <div class="panel-title"><h3>Passos atuais</h3><p>${activeSteps.length} passos ativos nesta versao.</p></div>
+              ${steps.length ? `<div class="compact-list">${steps.map((step, index) => `<div class="compact-item"><strong>${String(index + 1).padStart(2, "0")} · ${esc(labels[step.type] || step.type)}</strong><small>${esc(stepSummary(step))}</small></div>`).join("")}</div>` : '<div class="empty">Nenhum passo salvo.</div>'}
+            </div>
+            <div>
+              <div class="panel">
+                <div class="panel-title"><h3>Dados gerais</h3><p>Criado em ${esc(robot.created_at || "-")}</p></div>
+                <div class="compact-list">
+                  <div class="compact-item"><strong>Site inicial</strong><small>${esc(robot.start_url || "-")}</small></div>
+                  <div class="compact-item"><strong>Entradas</strong><small>${esc(Object.keys(workflow.inputs || {}).join(", ") || "-")}</small></div>
+                  <div class="compact-item"><strong>Agendas</strong><small>${panel.schedules.length}</small></div>
+                </div>
+              </div>
+              <div class="panel" style="margin-top:14px">
+                <div class="panel-title"><h3>Credenciais</h3><p>Vinculos usados por passos de login e email.</p></div>
+                ${panel.secrets.length ? `<div class="compact-list">${panel.secrets.map((item) => `<div class="compact-item"><strong>${esc(item.alias || item.secret_name)}</strong><small>${esc(item.secret_name)} · ${esc(item.description || item.secret_type)}</small></div>`).join("")}</div>` : '<div class="empty">Nenhuma credencial vinculada.</div>'}
+              </div>
+            </div>
+          </div>
+          <div class="layout" style="margin-top:14px">
+            <div class="panel">
+              <div class="panel-title"><h3>Ultima execucao</h3><p>${latestRun ? `Execucao ${latestRun.id} · ${esc(latestRun.started_at || latestRun.created_at || "-")}` : "Ainda sem execucoes."}</p></div>
+              ${latestRun ? `${renderRunsMiniTable([latestRun])}${latestArtifacts.length ? `<h3 style="margin-top:16px">Arquivos baixados</h3><div class="compact-list">${latestArtifacts.map((artifact) => artifactRow(artifact)).join("")}</div>` : '<div class="empty">Nenhum arquivo nesta ultima execucao.</div>'}` : '<div class="empty">Execute o robo para gerar historico.</div>'}
+            </div>
+            <div>
+              <div class="panel">
+                <div class="panel-title"><h3>Agendas</h3><p>Programacoes deste robo.</p></div>
+                ${panel.schedules.length ? `<div class="compact-list">${panel.schedules.map((item) => `<div class="compact-item"><strong>${esc(item.name)}</strong><small>${esc(item.cron)} · ${item.enabled ? "Ativa" : "Pausada"} · retries ${Number(item.max_retries || 0)}</small></div>`).join("")}</div>` : '<div class="empty">Nenhuma agenda criada.</div>'}
+              </div>
+              <div class="panel" style="margin-top:14px">
+                <div class="panel-title"><h3>Arquivos recentes</h3><p>Evidencias e downloads das execucoes.</p></div>
+                ${panel.artifacts.length ? `<div class="compact-list">${panel.artifacts.map((artifact) => artifactRow(artifact)).join("")}</div>` : '<div class="empty">Nenhum arquivo recente.</div>'}
+              </div>
+            </div>
+          </div>
+          <div class="panel" style="margin-top:14px">
+            <div class="panel-title"><h3>Historico recente</h3><p>Ultimas execucoes deste robo.</p></div>
+            ${panel.recent_runs.length ? renderRunsMiniTable(panel.recent_runs) : '<div class="empty">Nenhuma execucao encontrada.</div>'}
+          </div>`;
+      }
+      function artifactRow(artifact) {
+        return `<div class="compact-item"><strong>${esc(artifact.path)}</strong><small>Run ${artifact.run_id || "-"} · ${esc(artifact.kind)}</small><div class="toolbar" style="margin-top:8px"><button class="secondary tiny" onclick="downloadArtifact(${artifact.id})">Baixar</button></div></div>`;
+      }
+      function renderRunsMiniTable(runs) {
+        return `<div class="table-wrap"><table class="table"><tr><th>ID</th><th>Status</th><th>Maquina</th><th>Tentativa</th><th>Inicio</th><th>Erro</th></tr>${runs.map((run) => `<tr onclick="showRun(${run.id}); activateTab('logs')"><td>${run.id}</td><td>${pill(run.status)}</td><td>${esc(run.worker_name || run.machine_id || "-")}</td><td>${retryLabel(run)}</td><td>${esc(run.started_at || run.created_at || "-")}</td><td>${esc(run.error || "-")}</td></tr>`).join("")}</table></div>`;
       }
       async function runSelected(headless, messageSelector = "#robot-message") {
         if (!selectedRobot) return setMessage(messageSelector, "Selecione um robo.", "bad");
@@ -1327,6 +1450,21 @@
         event.stopPropagation();
         await selectRobot(id);
         await runSelected(true, "#project-message");
+      }
+      async function openRobotPanel(event, id) {
+        event.stopPropagation();
+        await selectRobot(id);
+        await activateTab("robot-panel");
+      }
+      async function panelRun(headless) {
+        if (!selectedRobot) return setMessage("#robot-panel-message", "Selecione um robo.", "bad");
+        await runSelected(headless, "#robot-panel-message");
+        setTimeout(() => loadRobotPanel().catch(() => {}), 1500);
+      }
+      function panelEdit() {
+        if (!selectedRobot) return setMessage("#robot-panel-message", "Selecione um robo.", "bad");
+        activateTab("studio");
+        showStage("teach");
       }
       async function reconfigureRobot(event, id) {
         event.stopPropagation();
@@ -1430,12 +1568,18 @@
         } catch (error) { setMessage("#robot-message", error.message, "bad"); }
       }
 
-      document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => {
+      async function activateTab(view) {
+        const tab = document.querySelector(`.tab[data-view="${view}"]`);
+        if (!tab) return;
         document.querySelectorAll(".tab, .view").forEach((element) => element.classList.remove("active"));
         tab.classList.add("active");
         document.querySelector(`#${tab.dataset.view}`).classList.add("active");
         document.querySelector("#view-title").textContent = tab.textContent;
-      }));
+        if (view === "robot-panel") {
+          await loadRobotPanel().catch((error) => setMessage("#robot-panel-message", error.message, "bad"));
+        }
+      }
+      document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => activateTab(tab.dataset.view)));
       document.querySelectorAll(".stage").forEach((stage) => stage.addEventListener("click", () => showStage(stage.dataset.stage)));
       document.querySelectorAll('input[name="purpose"]').forEach((input) => input.addEventListener("change", () => {
         const custom = document.querySelector('input[name="purpose"]:checked').value === "other";
@@ -1527,6 +1671,12 @@
         document.querySelector("#run-filter-status").value = "";
         loadRuns().catch((error) => alert(error.message));
       });
+      document.querySelector("#panel-robot-select").addEventListener("change", async (event) => {
+        const id = event.target.value;
+        if (id) await selectRobot(id);
+        await loadRobotPanel();
+      });
+      document.querySelector("#panel-refresh").addEventListener("click", () => loadRobotPanel().catch((error) => setMessage("#robot-panel-message", error.message, "bad")));
       document.querySelector("#start-record").addEventListener("click", async () => {
         if (!selectedRobot) return setMessage("#robot-message", "Escolha ou crie um robo primeiro.", "bad");
         const url = document.querySelector("#record-url").value.trim();

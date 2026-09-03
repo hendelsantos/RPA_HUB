@@ -31,6 +31,9 @@ Atualizacao da fase 7: o motor ganhou conectores para CSV, Excel, API HTTP, emai
 SQLite, monitoramento de pasta e PDF textual de evidencia, todos disponiveis no editor visual
 de passos.
 
+Atualizacao da fase 8: foi criada a aba Robo com painel operacional consolidado, incluindo
+dados gerais, passos atuais, credenciais, ultima execucao, arquivos, agendas e acoes principais.
+
 ## Prioridade 1 - Usabilidade principal
 
 ### 1. Construtor visual de passos

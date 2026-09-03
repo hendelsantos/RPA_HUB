@@ -89,6 +89,11 @@ class ArtifactOut(BaseModel):
     kind: str
 
 
+class PanelArtifactOut(ArtifactOut):
+    run_id: int
+    created_at: datetime
+
+
 class RunOut(BaseModel):
     id: int
     robot_id: int
@@ -118,6 +123,16 @@ class DashboardOut(BaseModel):
     workers_online: int
     schedules_enabled: int
     recent_runs: list[RunOut]
+
+
+class RobotPanelOut(BaseModel):
+    robot: RobotOut
+    latest_version: VersionOut | None
+    latest_run: RunOut | None
+    recent_runs: list[RunOut]
+    schedules: list["ScheduleOut"]
+    secrets: list["RobotSecretOut"]
+    artifacts: list[PanelArtifactOut]
 
 
 class WorkerRegister(BaseModel):

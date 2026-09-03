@@ -335,6 +335,35 @@ def test_runs_can_be_filtered_and_include_artifact_objects(client):
     assert "id" in runs[0]["artifacts"][0]
 
 
+def test_robot_panel_groups_operational_context(client):
+    robot = client.post("/robots", json={"name": "Robo painel", "description": "Operacao central"}).json()
+    secret = client.post("/secrets", json={"name": "painel.senha", "value": "valor"}).json()
+    client.post(f"/robots/{robot['id']}/secrets", json={"secret_id": secret["id"], "alias": "senha.painel"})
+    client.post(
+        "/schedules",
+        json={"robot_id": robot["id"], "name": "Painel diario", "cron": "0 8 * * *", "inputs": {}, "enabled": True},
+    )
+
+    with SessionLocal() as session:
+        version = session.scalar(select(RobotVersion).where(RobotVersion.robot_id == robot["id"]))
+        run = Run(robot_id=robot["id"], robot_version_id=version.id, status="SUCCESS", inputs={})
+        session.add(run)
+        session.flush()
+        session.add(Artifact(run_id=run.id, path="infra/artifacts/painel/saida.xlsx", kind="xlsx"))
+        session.commit()
+
+    response = client.get(f"/robots/{robot['id']}/panel")
+
+    assert response.status_code == 200
+    panel = response.json()
+    assert panel["robot"]["name"] == "Robo painel"
+    assert panel["latest_version"]["robot_id"] == robot["id"]
+    assert panel["latest_run"]["status"] == "SUCCESS"
+    assert panel["schedules"][0]["name"] == "Painel diario"
+    assert panel["secrets"][0]["alias"] == "senha.painel"
+    assert panel["artifacts"][0]["path"] == "infra/artifacts/painel/saida.xlsx"
+
+
 def test_download_artifact_returns_file(client, monkeypatch, tmp_path):
     from apps.api.rpa_hub_api import main as api_main
 

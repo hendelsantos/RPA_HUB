@@ -127,19 +127,19 @@ Resultado esperado: automatizar o processo inteiro, nao so o navegador.
 
 ## Fase 8 - Painel do robo
 
-Status: pendente.
+Status: iniciado.
 
 Cada robo deve ter uma pagina propria.
 
 Passos:
 
-1. Mostrar dados gerais do robo.
-2. Mostrar passos atuais.
-3. Mostrar credenciais vinculadas.
-4. Mostrar ultima execucao.
-5. Mostrar arquivos baixados.
-6. Mostrar agendas.
-7. Ter botoes claros: executar, testar, corrigir, criar copia, baixar backup e excluir.
+1. Mostrar dados gerais do robo. **Iniciado.**
+2. Mostrar passos atuais. **Iniciado.**
+3. Mostrar credenciais vinculadas. **Iniciado.**
+4. Mostrar ultima execucao. **Iniciado.**
+5. Mostrar arquivos baixados. **Iniciado.**
+6. Mostrar agendas. **Iniciado.**
+7. Ter botoes claros: executar, testar, corrigir, criar copia, baixar backup e excluir. **Iniciado.**
 
 Resultado esperado: operar cada robo em um lugar so.
 

@@ -12,8 +12,11 @@ class ScheduleRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def list_schedules(self) -> list[Schedule]:
-        return list(self.session.scalars(select(Schedule).order_by(Schedule.name)))
+    def list_schedules(self, robot_id: int | None = None) -> list[Schedule]:
+        stmt = select(Schedule)
+        if robot_id is not None:
+            stmt = stmt.where(Schedule.robot_id == robot_id)
+        return list(self.session.scalars(stmt.order_by(Schedule.name)))
 
     def create(
         self,

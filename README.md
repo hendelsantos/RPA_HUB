@@ -181,6 +181,16 @@ Quando um passo de navegador falhar, a tela de Logs mostra **Como corrigir** e s
 
 ## Gerenciar robos
 
+Na aba **Robo**, escolha um robo para ver o painel operacional em um lugar so:
+
+- dados gerais e versao atual;
+- passos ativos e resumo do workflow;
+- credenciais vinculadas;
+- ultima execucao, historico recente e maquina executora;
+- arquivos/evidencias recentes para baixar;
+- agendas do robo;
+- botoes para executar, testar visivel, corrigir, criar copia, baixar backup e excluir.
+
 Na lista **Meus robos**:
 
 - **Continuar** abre o robo para editar os passos atuais.

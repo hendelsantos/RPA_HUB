@@ -22,6 +22,7 @@ from apps.api.rpa_hub_api.schemas import (
     RobotDelete,
     RobotImport,
     RobotOut,
+    RobotPanelOut,
     RobotSecretAttach,
     RobotSecretOut,
     RobotSecretUpdate,
@@ -184,6 +185,36 @@ def get_robot(robot_id: int, session: Session = Depends(get_session)):
         raise HTTPException(status_code=404, detail="Robo nao encontrado.")
     latest = repo.latest_version(robot.id)
     return _robot_out(robot, latest.id if latest else None)
+
+
+@app.get("/robots/{robot_id}/panel", response_model=RobotPanelOut)
+def get_robot_panel(robot_id: int, session: Session = Depends(get_session)):
+    repo = RobotRepository(session)
+    robot = repo.get_robot(robot_id)
+    if not robot:
+        raise HTTPException(status_code=404, detail="Robo nao encontrado.")
+    latest = repo.latest_version(robot.id)
+    runs = RunService(session, BASE_DIR, ARTIFACTS_DIR).list_runs(8, robot_id=robot.id)
+    schedules = ScheduleRepository(session).list_schedules(robot_id=robot.id)
+    secret_links = _robot_secret_links(session, robot.id)
+    artifacts = list(
+        session.scalars(
+            select(Artifact)
+            .join(Run)
+            .where(Run.robot_id == robot.id)
+            .order_by(Artifact.created_at.desc(), Artifact.id.desc())
+            .limit(20)
+        )
+    )
+    return RobotPanelOut(
+        robot=_robot_out(robot, latest.id if latest else None),
+        latest_version=_version_out(latest) if latest else None,
+        latest_run=_run_out(runs[0]) if runs else None,
+        recent_runs=[_run_out(run) for run in runs],
+        schedules=[_schedule_out(schedule) for schedule in schedules],
+        secrets=[_robot_secret_out(link) for link in secret_links],
+        artifacts=[_panel_artifact_out(artifact) for artifact in artifacts],
+    )
 
 
 @app.patch("/robots/{robot_id}", response_model=RobotOut)
@@ -556,13 +587,7 @@ def test_secret(secret_id: int, session: Session = Depends(get_session)):
 def list_robot_secrets(robot_id: int, session: Session = Depends(get_session)):
     if RobotRepository(session).get_robot(robot_id) is None:
         raise HTTPException(status_code=404, detail="Robo nao encontrado.")
-    stmt = (
-        select(RobotSecret)
-        .where(RobotSecret.robot_id == robot_id)
-        .join(RobotSecret.secret)
-        .order_by(Secret.name)
-    )
-    return [_robot_secret_out(link) for link in session.scalars(stmt)]
+    return [_robot_secret_out(link) for link in _robot_secret_links(session, robot_id)]
 
 
 @app.post("/robots/{robot_id}/secrets", response_model=RobotSecretOut)
@@ -690,6 +715,30 @@ def _robot_out(robot, latest_version_id: int | None) -> RobotOut:
     )
 
 
+def _version_out(version: RobotVersion) -> VersionOut:
+    return VersionOut(
+        id=version.id,
+        robot_id=version.robot_id,
+        version=version.version,
+        status=version.status,
+        workflow=version.workflow,
+        created_at=version.created_at,
+    )
+
+
+def _schedule_out(schedule: Schedule) -> ScheduleOut:
+    return ScheduleOut(
+        id=schedule.id,
+        robot_id=schedule.robot_id,
+        name=schedule.name,
+        cron=schedule.cron,
+        inputs=schedule.inputs,
+        max_retries=schedule.max_retries,
+        enabled=schedule.enabled,
+        created_at=schedule.created_at,
+    )
+
+
 def _run_out(run: Run) -> RunOut:
     return RunOut(
         id=run.id,
@@ -710,6 +759,26 @@ def _run_out(run: Run) -> RunOut:
         logs=[{"level": step.level, "message": step.message, "data": step.data, "created_at": step.created_at.isoformat()} for step in run.steps],
         artifacts=[ArtifactOut(id=artifact.id, path=artifact.path, kind=artifact.kind) for artifact in run.artifacts],
     )
+
+
+def _panel_artifact_out(artifact: Artifact):
+    return {
+        "id": artifact.id,
+        "path": artifact.path,
+        "kind": artifact.kind,
+        "run_id": artifact.run_id,
+        "created_at": artifact.created_at,
+    }
+
+
+def _robot_secret_links(session: Session, robot_id: int) -> list[RobotSecret]:
+    stmt = (
+        select(RobotSecret)
+        .where(RobotSecret.robot_id == robot_id)
+        .join(RobotSecret.secret)
+        .order_by(Secret.name)
+    )
+    return list(session.scalars(stmt))
 
 
 def _guided_workflow(payload: GuidedRobotCreate) -> dict:
