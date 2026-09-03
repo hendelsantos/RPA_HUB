@@ -80,6 +80,7 @@ class WorkflowValidationOut(BaseModel):
 class RunCreate(BaseModel):
     inputs: dict[str, Any] = Field(default_factory=dict)
     headless: bool = False
+    max_retries: int = Field(default=0, ge=0, le=5)
 
 
 class ArtifactOut(BaseModel):
@@ -94,6 +95,12 @@ class RunOut(BaseModel):
     robot_version_id: int
     status: str
     inputs: dict[str, Any]
+    headless: bool
+    worker_id: int | None
+    worker_name: str | None
+    machine_id: str | None
+    retry_count: int
+    max_retries: int
     error: str | None
     created_at: datetime
     started_at: datetime | None
@@ -156,6 +163,11 @@ class RobotSecretAttach(BaseModel):
     alias: str = ""
 
 
+class RobotSecretUpdate(BaseModel):
+    secret_id: int | None = None
+    alias: str | None = None
+
+
 class RobotSecretOut(BaseModel):
     id: int
     robot_id: int
@@ -172,6 +184,7 @@ class ScheduleCreate(BaseModel):
     name: str
     cron: str
     inputs: dict[str, Any] = Field(default_factory=dict)
+    max_retries: int = Field(default=0, ge=0, le=5)
     enabled: bool = True
 
 
@@ -185,6 +198,7 @@ class ScheduleOut(BaseModel):
     name: str
     cron: str
     inputs: dict[str, Any]
+    max_retries: int = 0
     enabled: bool
     created_at: datetime
 

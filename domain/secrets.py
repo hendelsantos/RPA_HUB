@@ -35,6 +35,9 @@ class SecretStore:
         self.session.flush()
         return secret
 
+    def can_resolve(self, name: str) -> bool:
+        return self.resolve(name) is not None
+
     def resolve(self, name: str) -> str | None:
         secret = self.session.scalar(select(Secret).where(Secret.name == name))
         if secret is None:

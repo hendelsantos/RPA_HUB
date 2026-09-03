@@ -6,6 +6,7 @@ Aplicacao de automacao robotica de processos para criar, versionar, executar e m
 
 - Tela unica de Logs com indicadores, historico de execucoes, detalhes e artefatos.
 - Filtros de logs por robo e status, linha do tempo por execucao e download de artefatos.
+- Sugestoes de correcao quando um passo de navegador nao encontra campo, botao, menu ou link.
 - Cadastro de robos com workflow JSON versionado.
 - Criacao de copias e backup/restauracao de robos em JSON.
 - Publicacao de versoes e criacao de novas versoes draft.
@@ -18,6 +19,9 @@ Aplicacao de automacao robotica de processos para criar, versionar, executar e m
 - Agendas persistidas em SQLite com formato cron.
 - Auditoria de criacao, publicacao, execucao, credencial, worker e agenda.
 - Inicio do Modo Ensinar por gravacao assistida de navegador.
+- Gravador de navegador com seletores melhores, variaveis automaticas e senha como credencial.
+- Editor visual com resumo de cada passo e acoes para duplicar, mover e desativar sem apagar.
+- Fila local de execucao com limite de concorrencia, recuperacao de execucoes interrompidas e cancelamento.
 
 ## Instalar
 
@@ -94,6 +98,8 @@ RPA_HUB_DATABASE_URL=sqlite:///./outro_banco.db uvicorn apps.api.rpa_hub_api.mai
 - **Sandbox (opcional):** `RPA_HUB_ALLOWED_ROOTS` restringe os passos de arquivo a pastas especificas e `RPA_HUB_ALLOWED_COMMANDS` restringe quais programas o passo `command_run` pode executar. Exemplo: `RPA_HUB_ALLOWED_ROOTS=C:\RPA,D:\Entradas RPA_HUB_ALLOWED_COMMANDS=python,powershell`. Sem essas variaveis, o robo opera como antes, mas comandos nunca recebem as variaveis de ambiente internas do servidor (como chaves e senhas).
 - A extracao de ZIP valida cada arquivo e bloqueia arquivos que tentem escapar da pasta de destino.
 
+Na tela **Credenciais**, o botao **Testar** confirma se o Hub consegue abrir a credencial cifrada sem mostrar o valor. Em **Credenciais deste robo**, use um apelido estavel, como `senha.portal`; depois, os passos podem referenciar esse apelido e voce consegue trocar a credencial vinculada sem editar o workflow.
+
 ## Rodar worker local
 
 ```bash
@@ -158,6 +164,9 @@ Na etapa **3. Execucao**, o Hub mostra essas entradas para voce alterar antes de
 
 Em **Studio > Ensinar > Ferramentas avancadas**, use **Modelos rapidos** para inserir blocos prontos no robo:
 
+- **Baixar arquivo de sistema**
+- **Pesquisar no Google**
+- **Entrar em site com senha**
 - **Pasta + arquivo**
 - **Copiar + ZIP**
 - **Executar comando**
@@ -165,6 +174,10 @@ Em **Studio > Ensinar > Ferramentas avancadas**, use **Modelos rapidos** para in
 - **Desktop simples**
 
 Depois de inserir um modelo, ajuste os campos, confira os passos e clique em **Salvar robo**.
+
+Para um fluxo comum de trabalho, use **Baixar arquivo de sistema**. Ele cria passos para abrir o sistema, preencher usuario e senha, entrar, abrir a aba de relatorios, filtrar pelo `{{modelo}}`, baixar o arquivo e salvar uma evidencia. Ajuste os textos dos campos e botoes para os nomes reais que aparecem no seu sistema.
+
+Quando um passo de navegador falhar, a tela de Logs mostra **Como corrigir** e salva um print da tela no momento do erro quando possivel. Use essa evidencia para ajustar o nome do campo, botao, menu ou link.
 
 ## Gerenciar robos
 
@@ -230,6 +243,20 @@ O mesmo robo tambem pode executar passos locais no Windows ou Linux sem precisar
 - `file_zip`: compacta arquivo ou pasta em ZIP.
 - `file_unzip`: extrai um ZIP.
 - `command_run`: executa um programa ou comando local.
+
+## Conectores praticos
+
+Na mesma lista de passos avancados, o Hub tambem possui conectores para processos comuns:
+
+- `csv_read` e `csv_write`: leem e geram CSV.
+- `excel_read` e `excel_write`: leem e geram `.xlsx`.
+- `api_request`: chama APIs HTTP e pode salvar a resposta como evidencia JSON.
+- `email_send`: envia email por SMTP usando credencial do cofre para a senha.
+- `db_query`: executa consulta em banco SQLite e pode salvar resultado em CSV.
+- `folder_wait_for_file`: espera um arquivo aparecer em uma pasta.
+- `pdf_from_text`: gera uma evidencia em PDF simples a partir de texto.
+
+Para gerar tabelas, informe os dados como JSON no campo valor, por exemplo `[{"cliente":"HMB","status":"ok"}]`, ou leia primeiro um CSV/Excel para uma variavel e reutilize essa variavel no passo seguinte.
 
 Para controlar mouse e teclado com passos `desktop_*`, o Hub precisa estar rodando na mesma sessao grafica do usuario. Em Linux, se aparecer mensagem sobre `DISPLAY` ou `XAUTHORITY`, use robos de navegador/arquivos ou reinicie o Hub dentro da tela grafica correta.
 

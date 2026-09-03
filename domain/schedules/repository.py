@@ -15,8 +15,23 @@ class ScheduleRepository:
     def list_schedules(self) -> list[Schedule]:
         return list(self.session.scalars(select(Schedule).order_by(Schedule.name)))
 
-    def create(self, robot_id: int, name: str, cron: str, inputs: dict[str, Any], enabled: bool = True) -> Schedule:
-        schedule = Schedule(robot_id=robot_id, name=name, cron=cron, inputs=inputs, enabled=enabled)
+    def create(
+        self,
+        robot_id: int,
+        name: str,
+        cron: str,
+        inputs: dict[str, Any],
+        max_retries: int = 0,
+        enabled: bool = True,
+    ) -> Schedule:
+        schedule = Schedule(
+            robot_id=robot_id,
+            name=name,
+            cron=cron,
+            inputs=inputs,
+            max_retries=min(max(max_retries, 0), 5),
+            enabled=enabled,
+        )
         self.session.add(schedule)
         self.session.flush()
         return schedule

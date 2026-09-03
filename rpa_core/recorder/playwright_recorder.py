@@ -4,6 +4,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
+import re
 from typing import Any
 
 from playwright.sync_api import Error as PlaywrightError, sync_playwright
@@ -14,18 +15,55 @@ from rpa_core.variables import normalize_url
 RECORDER_SCRIPT = """
 window.__rpaEvents = [];
 window.__rpaDownloadExts = ['.xlsx', '.xls', '.csv', '.pdf', '.txt', '.zip', '.docx'];
+window.__rpaLastEvent = '';
+function cleanText(text) {
+  return (text || '').replace(/\\s+/g, ' ').trim();
+}
+function labelFor(el) {
+  if (!el) return '';
+  const aria = cleanText(el.getAttribute('aria-label'));
+  if (aria) return aria;
+  if (el.labels && el.labels.length) {
+    const text = cleanText(Array.from(el.labels).map((label) => label.innerText).join(' '));
+    if (text) return text;
+  }
+  if (el.id) {
+    const label = document.querySelector('label[for="' + CSS.escape(el.id) + '"]');
+    const text = label ? cleanText(label.innerText) : '';
+    if (text) return text;
+  }
+  return '';
+}
 function selectorFor(el) {
+  const label = labelFor(el);
+  if (label) return { label };
+  const role = el.getAttribute ? el.getAttribute('role') : '';
+  const text = cleanText(el.innerText || el.value || el.getAttribute?.('title'));
+  const tag = el.tagName ? el.tagName.toLowerCase() : '';
+  if ((tag === 'button' || role === 'button') && text && text.length < 80) return { role: 'button', name: text };
+  if (tag === 'a' && text && text.length < 80) return { text };
   if (el.id) return { css: '#' + CSS.escape(el.id) };
-  if (el.getAttribute('aria-label')) return { css: '[aria-label="' + el.getAttribute('aria-label') + '"]' };
+  if (el.getAttribute && el.getAttribute('placeholder')) return { css: '[placeholder="' + el.getAttribute('placeholder') + '"]' };
   if (el.name) return { css: '[name="' + el.name + '"]' };
-  if (el.innerText && el.innerText.trim().length < 80) return { text: el.innerText.trim() };
+  if (text && text.length < 80) return { text };
   return { css: el.tagName.toLowerCase() };
+}
+function targetLabel(el) {
+  return labelFor(el) || cleanText(el.getAttribute?.('placeholder')) || cleanText(el.name) || cleanText(el.id) || 'campo';
 }
 function cleanName(text, fallback) {
   const value = (text || fallback || 'arquivo').trim().split('/').pop().split('?')[0];
   return value || 'arquivo';
 }
+function pushEvent(rpaEvent) {
+  const key = JSON.stringify(rpaEvent);
+  if (key === window.__rpaLastEvent) return;
+  window.__rpaLastEvent = key;
+  window.__rpaEvents.push(rpaEvent);
+  if (window.rpaRecord) window.rpaRecord(rpaEvent);
+}
 document.addEventListener('click', (event) => {
+  if (event.target && ['INPUT','TEXTAREA','SELECT','OPTION'].includes(event.target.tagName)) return;
   const link = event.target.closest ? event.target.closest('a') : null;
   if (link && link.href) {
     const href = link.href.toLowerCase();
@@ -36,14 +74,12 @@ document.addEventListener('click', (event) => {
         target: selectorFor(link),
         filename: cleanName(link.innerText, link.href)
       };
-      window.__rpaEvents.push(rpaEvent);
-      if (window.rpaRecord) window.rpaRecord(rpaEvent);
+      pushEvent(rpaEvent);
       return;
     }
   }
   const rpaEvent = { type: 'click', target: selectorFor(event.target) };
-  window.__rpaEvents.push(rpaEvent);
-  if (window.rpaRecord) window.rpaRecord(rpaEvent);
+  pushEvent(rpaEvent);
 }, true);
 document.addEventListener('change', (event) => {
   const target = event.target;
@@ -51,27 +87,42 @@ document.addEventListener('change', (event) => {
     const isPassword = target.type && target.type.toLowerCase() === 'password';
     const isSelect = target.tagName === 'SELECT';
     const rpaEvent = isPassword
-      ? { type: 'secret_fill', target: selectorFor(target), secret: 'defina_um_segredo', meta: { sensitive: true } }
+      ? { type: 'secret_fill', target: selectorFor(target), secret: 'portal.password', meta: { sensitive: true, label: targetLabel(target) } }
       : isSelect
-        ? { type: 'select', target: selectorFor(target), value: target.value }
-        : { type: 'fill', target: selectorFor(target), value: '', meta: { recorded_input: true } };
-    window.__rpaEvents.push(rpaEvent);
-    if (window.rpaRecord) window.rpaRecord(rpaEvent);
+        ? { type: 'select', target: selectorFor(target), value: target.value, meta: { label: targetLabel(target) } }
+        : { type: 'fill', target: selectorFor(target), value: '', meta: { recorded_input: true, label: targetLabel(target) } };
+    pushEvent(rpaEvent);
   }
 }, true);
 """
+
+
+def _input_name(label: str, counter: int) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9_.-]+", "_", label.strip().lower()).strip("_")
+    if not cleaned:
+        cleaned = f"campo_{counter}"
+    if cleaned[0].isdigit():
+        cleaned = f"campo_{cleaned}"
+    return cleaned[:50]
 
 
 def parameterize_events(events: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, str]]:
     steps: list[dict[str, Any]] = []
     inputs: dict[str, str] = {}
     counter = 0
+    previous_raw: dict[str, Any] | None = None
     for event in events:
         step = {key: value for key, value in event.items() if key != "meta"}
+        if step == previous_raw:
+            continue
+        previous_raw = dict(step)
         meta = event.get("meta") or {}
         if meta.get("recorded_input"):
             counter += 1
-            name = f"campo_{counter}"
+            name = _input_name(str(meta.get("label") or ""), counter)
+            while name in inputs:
+                counter += 1
+                name = f"{name}_{counter}"
             step["value"] = "{{" + name + "}}"
             inputs[name] = ""
         steps.append(step)
@@ -119,6 +170,8 @@ class RecorderManager:
         session.stop_event.set()
         if session.thread and session.thread.is_alive():
             session.thread.join(timeout=timeout)
+        with self._lock:
+            self._sessions.pop(session_id, None)
         return session
 
     def _run_session(self, session: RecordingSession) -> None:

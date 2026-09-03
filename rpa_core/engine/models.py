@@ -25,6 +25,15 @@ StepType = Literal[
     "file_read_text",
     "file_zip",
     "file_unzip",
+    "csv_read",
+    "csv_write",
+    "excel_read",
+    "excel_write",
+    "api_request",
+    "email_send",
+    "db_query",
+    "folder_wait_for_file",
+    "pdf_from_text",
     "command_run",
     "desktop_move",
     "desktop_click",
@@ -63,6 +72,19 @@ class WorkflowStep(BaseModel):
     output_name: str | None = None
     variable: str | None = None
     secret: str | None = None
+    method: str = "GET"
+    headers: dict[str, str] = Field(default_factory=dict)
+    body: str | None = None
+    query: str | None = None
+    sheet: str = "Planilha1"
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+    delimiter: str = ","
+    host: str | None = None
+    port: int = 587
+    username: str | None = None
+    password_secret: str | None = None
+    to: str | None = None
+    subject: str | None = None
     key: str | None = None
     keys: list[str] = Field(default_factory=list)
     x: int | None = None

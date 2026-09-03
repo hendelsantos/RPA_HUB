@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import AsyncIterator
 
 from apscheduler.triggers.cron import CronTrigger
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -24,6 +24,7 @@ from apps.api.rpa_hub_api.schemas import (
     RobotOut,
     RobotSecretAttach,
     RobotSecretOut,
+    RobotSecretUpdate,
     RobotUpdate,
     RunCreate,
     RunOut,
@@ -45,7 +46,7 @@ from apps.api.rpa_hub_api.schemas import (
 )
 from domain.audit import audit
 from domain.robots import RobotRepository
-from domain.runs import RunService
+from domain.runs import RunQueueDispatcher, RunService
 from domain.schedules import ScheduleRepository
 from domain.secrets import SecretStore
 from domain.workers import WorkerRepository
@@ -63,7 +64,8 @@ BASE_DIR = Path(__file__).resolve().parents[3]
 ARTIFACTS_DIR = BASE_DIR / "infra" / "artifacts"
 WEB_INDEX = BASE_DIR / "apps" / "web" / "src" / "index.html"
 
-scheduler = HubScheduler(BASE_DIR, ARTIFACTS_DIR)
+dispatcher = RunQueueDispatcher(BASE_DIR, ARTIFACTS_DIR)
+scheduler = HubScheduler(BASE_DIR, ARTIFACTS_DIR, dispatcher)
 recorder_manager = RecorderManager()
 
 
@@ -71,11 +73,13 @@ recorder_manager = RecorderManager()
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     init_db()
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+    dispatcher.start()
     scheduler.start()
     try:
         yield
     finally:
         scheduler.shutdown()
+        dispatcher.shutdown()
 
 
 app = FastAPI(
@@ -364,16 +368,30 @@ def activate_robot(robot_id: int, session: Session = Depends(get_session)):
 
 
 @app.post("/robots/{robot_id}/run", response_model=RunOut)
-def run_robot(robot_id: int, payload: RunCreate, background_tasks: BackgroundTasks, session: Session = Depends(get_session)):
+def run_robot(robot_id: int, payload: RunCreate, session: Session = Depends(get_session)):
     service = RunService(session, BASE_DIR, ARTIFACTS_DIR)
     try:
-        run = service.create_run(robot_id, payload.inputs)
+        run = service.create_run(robot_id, payload.inputs, payload.headless, payload.max_retries)
     except ValueError as exc:
         status_code = 400 if "sem versao ativa" in str(exc) else 404
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     audit(session, "run.queued", "run", run.id, {"robot_id": robot_id})
     session.commit()
-    background_tasks.add_task(_execute_run_background, run.id, payload.headless)
+    dispatcher.wake()
+    return _run_out(run)
+
+
+@app.post("/runs/{run_id}/cancel", response_model=RunOut)
+def cancel_run(run_id: int, session: Session = Depends(get_session)):
+    service = RunService(session, BASE_DIR, ARTIFACTS_DIR)
+    try:
+        run = service.cancel_run(run_id)
+    except ValueError as exc:
+        status_code = 404 if "nao encontrada" in str(exc) else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    audit(session, "run.cancelled", "run", run.id, {"status": run.status})
+    session.commit()
+    dispatcher.wake()
     return _run_out(run)
 
 
@@ -522,6 +540,18 @@ def create_secret(payload: SecretCreate, session: Session = Depends(get_session)
     return _secret_out(secret)
 
 
+@app.post("/secrets/{secret_id}/test")
+def test_secret(secret_id: int, session: Session = Depends(get_session)):
+    secret = session.get(Secret, secret_id)
+    if secret is None:
+        raise HTTPException(status_code=404, detail="Credencial nao encontrada.")
+    if not SecretStore(session).can_resolve(secret.name):
+        raise HTTPException(status_code=400, detail="Nao foi possivel abrir esta credencial. Confira a chave de cifragem do Hub.")
+    audit(session, "secret.tested", "secret", secret.id, {"name": secret.name, "ok": True})
+    session.commit()
+    return {"ok": True, "message": "Credencial pronta para uso."}
+
+
 @app.get("/robots/{robot_id}/secrets", response_model=list[RobotSecretOut])
 def list_robot_secrets(robot_id: int, session: Session = Depends(get_session)):
     if RobotRepository(session).get_robot(robot_id) is None:
@@ -553,6 +583,36 @@ def attach_robot_secret(robot_id: int, payload: RobotSecretAttach, session: Sess
     return _robot_secret_out(link)
 
 
+@app.patch("/robots/{robot_id}/secrets/{link_id}", response_model=RobotSecretOut)
+def update_robot_secret(robot_id: int, link_id: int, payload: RobotSecretUpdate, session: Session = Depends(get_session)):
+    link = session.get(RobotSecret, link_id)
+    if link is None or link.robot_id != robot_id:
+        raise HTTPException(status_code=404, detail="Credencial do robo nao encontrada.")
+    if payload.secret_id is not None:
+        secret = session.get(Secret, payload.secret_id)
+        if secret is None:
+            raise HTTPException(status_code=404, detail="Segredo nao encontrado.")
+        existing = session.scalar(
+            select(RobotSecret).where(
+                RobotSecret.robot_id == robot_id,
+                RobotSecret.secret_id == secret.id,
+                RobotSecret.id != link.id,
+            )
+        )
+        if existing is not None:
+            session.delete(link)
+            existing.alias = payload.alias if payload.alias is not None else existing.alias
+            link = existing
+        else:
+            link.secret_id = secret.id
+    if payload.alias is not None:
+        link.alias = payload.alias
+    session.flush()
+    audit(session, "robot_secret.updated", "robot", robot_id, {"link_id": link.id, "secret_id": link.secret_id})
+    session.commit()
+    return _robot_secret_out(link)
+
+
 @app.delete("/robots/{robot_id}/secrets/{link_id}")
 def detach_robot_secret(robot_id: int, link_id: int, session: Session = Depends(get_session)):
     link = session.get(RobotSecret, link_id)
@@ -578,7 +638,14 @@ def create_schedule(payload: ScheduleCreate, session: Session = Depends(get_sess
         CronTrigger.from_crontab(payload.cron)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=f"Programacao cron invalida: {exc}") from exc
-    schedule = ScheduleRepository(session).create(payload.robot_id, payload.name, payload.cron, payload.inputs, payload.enabled)
+    schedule = ScheduleRepository(session).create(
+        payload.robot_id,
+        payload.name,
+        payload.cron,
+        payload.inputs,
+        payload.max_retries,
+        payload.enabled,
+    )
     audit(session, "schedule.created", "schedule", schedule.id, {"robot_id": schedule.robot_id})
     session.commit()
     scheduler.reload()
@@ -611,16 +678,6 @@ def list_audit_events(limit: int = 80, session: Session = Depends(get_session)):
         }
         for event in events
     ]
-
-
-def _execute_run_background(run_id: int, headless: bool) -> None:
-    session = SessionLocal()
-    try:
-        RunService(session, BASE_DIR, ARTIFACTS_DIR).execute_run(run_id, headless)
-    finally:
-        session.close()
-
-
 def _robot_out(robot, latest_version_id: int | None) -> RobotOut:
     return RobotOut(
         id=robot.id,
@@ -640,6 +697,12 @@ def _run_out(run: Run) -> RunOut:
         robot_version_id=run.robot_version_id,
         status=run.status,
         inputs=run.inputs,
+        headless=run.headless,
+        worker_id=run.worker_id,
+        worker_name=run.worker_name,
+        machine_id=run.machine_id,
+        retry_count=run.retry_count,
+        max_retries=run.max_retries,
         error=run.error,
         created_at=run.created_at,
         started_at=run.started_at,

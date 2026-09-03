@@ -3,9 +3,11 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from domain.robots import RobotRepository
-from domain.runs import RunService
+from domain.runs import RunQueueDispatcher, RunService
 from infra.db.models import Artifact, AuditEvent, RobotVersion, Run, RunStep
 from infra.db.session import SessionLocal
+from infra.time import utc_now
+from rpa_core.engine.executor import WorkflowExecutionError
 from rpa_core.variables import normalize_url, suggest_url_correction
 
 
@@ -107,6 +109,66 @@ def test_robot_secret_links_hide_values_and_reference_secret_name(client):
     delete_response = client.delete(f"/robots/{robot['id']}/secrets/{linked['id']}")
     assert delete_response.status_code == 200
     assert client.get(f"/robots/{robot['id']}/secrets").json() == []
+
+
+def test_secret_can_be_tested_without_exposing_value(client):
+    secret = client.post(
+        "/secrets",
+        json={"name": "teste.conexao", "value": "valor-que-nao-vaza", "description": "Teste"},
+    ).json()
+
+    response = client.post(f"/secrets/{secret['id']}/test")
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    assert "valor-que-nao-vaza" not in str(response.json())
+
+
+def test_robot_secret_alias_can_be_swapped_without_editing_workflow(client, monkeypatch, tmp_path):
+    captured = []
+
+    class SecretReadingExecutor:
+        def __init__(self, *args, secret_resolver=None, **kwargs):
+            self.secret_resolver = secret_resolver
+
+        def run(self, workflow, inputs, log, should_cancel=None):
+            captured.append(self.secret_resolver("senha.portal"))
+            return []
+
+    monkeypatch.setattr("domain.runs.service.WorkflowExecutor", SecretReadingExecutor)
+
+    robot = client.post("/robots", json={"name": "Robo troca credencial"}).json()
+    first_secret = client.post("/secrets", json={"name": "portal.antigo", "value": "antiga"}).json()
+    second_secret = client.post("/secrets", json={"name": "portal.novo", "value": "nova"}).json()
+    linked = client.post(
+        f"/robots/{robot['id']}/secrets",
+        json={"secret_id": first_secret["id"], "alias": "senha.portal"},
+    ).json()
+
+    workflow = {"inputs": {}, "steps": [{"type": "secret_fill", "target": {"label": "Senha"}, "secret": "senha.portal"}]}
+    version = client.get(f"/robots/{robot['id']}/versions/latest").json()
+    client.put(f"/robot-versions/{version['id']}", json={"workflow": workflow})
+    client.post(f"/robots/{robot['id']}/activate")
+
+    with SessionLocal() as session:
+        service = RunService(session, tmp_path, tmp_path / "artifacts")
+        run = service.create_run(robot["id"], {})
+        session.commit()
+        service.execute_run(run.id, headless=True)
+
+    response = client.patch(
+        f"/robots/{robot['id']}/secrets/{linked['id']}",
+        json={"secret_id": second_secret["id"], "alias": "senha.portal"},
+    )
+    assert response.status_code == 200
+
+    with SessionLocal() as session:
+        service = RunService(session, tmp_path, tmp_path / "artifacts")
+        run = service.create_run(robot["id"], {})
+        session.commit()
+        service.execute_run(run.id, headless=True)
+
+    assert captured == ["antiga", "nova"]
 
 
 def test_reconfigure_robot_creates_new_draft_version(client):
@@ -349,6 +411,133 @@ def test_run_executes_the_version_that_was_queued(monkeypatch, tmp_path):
     assert captured_workflows == [{"inputs": {}, "steps": [{"type": "screenshot", "name": "v1"}]}]
 
 
+def test_queue_dispatcher_executes_queued_run(monkeypatch, tmp_path):
+    class FakeWorkflowExecutor:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def run(self, workflow, inputs, log, should_cancel=None):
+            log("INFO", "Executado pela fila.", {"status": "SUCCESS"})
+            return []
+
+    monkeypatch.setattr("domain.runs.service.WorkflowExecutor", FakeWorkflowExecutor)
+
+    with SessionLocal() as session:
+        robot = RobotRepository(session).create_robot_with_workflow(
+            name="Robo em fila",
+            workflow={"inputs": {}, "steps": [{"type": "screenshot", "name": "fila"}]},
+            publish=True,
+        )
+        run = RunService(session, tmp_path, tmp_path / "artifacts").create_run(robot.id, {}, headless=True)
+        session.commit()
+        run_id = run.id
+
+    dispatcher = RunQueueDispatcher(tmp_path, tmp_path / "artifacts", max_concurrent_runs=1, poll_interval_seconds=0.05)
+    queued = dispatcher._next_queued_run()
+    assert queued == (run_id, True)
+    dispatcher._execute(run_id, True)
+
+    with SessionLocal() as session:
+        result = session.get(Run, run_id)
+        assert result.status == "SUCCESS"
+        assert result.headless is True
+        assert result.worker_name
+        assert result.machine_id
+
+
+def test_failed_run_is_requeued_until_retry_limit(monkeypatch, tmp_path):
+    attempts = {"count": 0}
+
+    class FlakyWorkflowExecutor:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def run(self, workflow, inputs, log, should_cancel=None):
+            attempts["count"] += 1
+            if attempts["count"] == 1:
+                raise RuntimeError("Falha temporaria")
+            log("INFO", "Tentativa recuperada.", {"status": "SUCCESS"})
+            return []
+
+    monkeypatch.setattr("domain.runs.service.WorkflowExecutor", FlakyWorkflowExecutor)
+
+    with SessionLocal() as session:
+        robot = RobotRepository(session).create_robot_with_workflow(
+            name="Robo com retry",
+            workflow={"inputs": {}, "steps": [{"type": "screenshot", "name": "retry"}]},
+            publish=True,
+        )
+        run = RunService(session, tmp_path, tmp_path / "artifacts").create_run(robot.id, {}, max_retries=1)
+        session.commit()
+        run_id = run.id
+
+        service = RunService(session, tmp_path, tmp_path / "artifacts")
+        first = service.execute_run(run_id, headless=True)
+        assert first.status == "QUEUED"
+        assert first.retry_count == 1
+
+        second = service.execute_run(run_id, headless=True)
+        assert second.status == "SUCCESS"
+        assert second.retry_count == 1
+
+    assert attempts["count"] == 2
+
+
+def test_queued_run_can_be_cancelled(tmp_path):
+    with SessionLocal() as session:
+        robot = RobotRepository(session).create_robot_with_workflow(
+            name="Robo cancelavel",
+            workflow={"inputs": {}, "steps": [{"type": "screenshot", "name": "cancelar"}]},
+            publish=True,
+        )
+        service = RunService(session, tmp_path, tmp_path / "artifacts")
+        run = service.create_run(robot.id, {})
+        session.commit()
+
+        result = service.cancel_run(run.id)
+
+    assert result.status == "CANCELLED"
+    assert result.finished_at is not None
+    assert "cancelada" in result.error
+
+
+def test_running_run_cancel_request_stops_before_next_step(tmp_path):
+    with SessionLocal() as session:
+        robot = RobotRepository(session).create_robot_with_workflow(
+            name="Robo cancelado em execucao",
+            workflow={"inputs": {}, "steps": [{"type": "file_write_text", "path": str(tmp_path / "nao.txt"), "value": "nao"}]},
+            publish=True,
+        )
+        service = RunService(session, tmp_path, tmp_path / "artifacts")
+        run = service.create_run(robot.id, {})
+        run.cancellation_requested_at = utc_now()
+        session.commit()
+
+        result = service.execute_run(run.id, headless=True)
+
+    assert result.status == "CANCELLED"
+    assert not (tmp_path / "nao.txt").exists()
+
+
+def test_recover_interrupted_running_runs(tmp_path):
+    with SessionLocal() as session:
+        robot = RobotRepository(session).create_robot_with_workflow(
+            name="Robo travado",
+            workflow={"inputs": {}, "steps": [{"type": "screenshot", "name": "travado"}]},
+            publish=True,
+        )
+        run = Run(robot_id=robot.id, robot_version_id=robot.versions[0].id, status="RUNNING", inputs={})
+        session.add(run)
+        session.commit()
+
+        recovered = RunService(session, tmp_path, tmp_path / "artifacts").recover_interrupted_runs()
+        session.refresh(run)
+
+    assert recovered == 1
+    assert run.status == "FAILED"
+    assert "recuperada" in run.error
+
+
 def test_desktop_display_error_is_friendly(monkeypatch, tmp_path):
     class BrokenWorkflowExecutor:
         def __init__(self, *args, **kwargs):
@@ -376,6 +565,46 @@ def test_desktop_display_error_is_friendly(monkeypatch, tmp_path):
 
     assert result.status == "FAILED"
     assert "Controle do PC nao esta disponivel" in result.error
+
+
+def test_failed_workflow_persists_failure_evidence(monkeypatch, tmp_path):
+    class BrokenWorkflowExecutor:
+        def __init__(self, artifacts_dir, *args, **kwargs):
+            self.artifacts_dir = artifacts_dir
+
+        def run(self, workflow, inputs, log):
+            evidence = self.artifacts_dir / "falha-passo-5.png"
+            evidence.parent.mkdir(parents=True, exist_ok=True)
+            evidence.write_text("print fake", encoding="utf-8")
+            raise WorkflowExecutionError(
+                "Passo 5 nao encontrou o texto 'Relatorios'. Troque o texto esperado pelo nome real da aba.",
+                [evidence],
+            )
+
+    monkeypatch.setattr("domain.runs.service.WorkflowExecutor", BrokenWorkflowExecutor)
+
+    with SessionLocal() as session:
+        repo = RobotRepository(session)
+        robot = repo.create_robot_with_workflow(
+            name="Robo com evidencia de falha",
+            workflow={"inputs": {}, "steps": [{"type": "wait_for", "target": {"text": "Relatorios"}}]},
+            publish=True,
+        )
+        session.commit()
+
+        service = RunService(session, tmp_path, tmp_path / "artifacts")
+        run = service.create_run(robot.id, {})
+        session.commit()
+
+        result = service.execute_run(run.id, headless=True)
+
+    assert result.status == "FAILED"
+    assert "Passo 5 nao encontrou" in result.error
+
+    with SessionLocal() as session:
+        artifact = session.scalar(select(Artifact).where(Artifact.run_id == result.id))
+        assert artifact is not None
+        assert artifact.path.endswith("falha-passo-5.png")
 
 
 def test_navigation_certificate_error_is_friendly(monkeypatch, tmp_path):

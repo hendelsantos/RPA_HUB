@@ -19,6 +19,18 @@ Credenciais avancadas ficam para depois. O produto tambem nao precisa de instala
 
 Depois disso, faz sentido seguir para fila inteligente, permissoes e notificacoes.
 
+Atualizacao da fase 5: a fila local agora registra a maquina executora, permite cancelamento,
+recupera execucoes interrompidas e aceita repeticao automatica apos falha em execucoes manuais
+e agendadas.
+
+Atualizacao da fase 6: credenciais continuam cifradas, podem ser testadas sem expor valor,
+podem ser vinculadas ao robo por apelido estavel e trocadas depois sem editar os passos.
+Perfis de usuario e login obrigatorio ficaram adiados para manter o uso local simples.
+
+Atualizacao da fase 7: o motor ganhou conectores para CSV, Excel, API HTTP, email SMTP,
+SQLite, monitoramento de pasta e PDF textual de evidencia, todos disponiveis no editor visual
+de passos.
+
 ## Prioridade 1 - Usabilidade principal
 
 ### 1. Construtor visual de passos
@@ -61,8 +73,9 @@ Melhoria:
 - Status por passo. **Iniciado.**
 - Duracao por passo. **Iniciado.**
 - Artefatos clicaveis. **Iniciado.**
-- Evidencia de erro destacada.
+- Evidencia de erro destacada. **Iniciado.**
 - Filtro por robo, status e data. **Iniciado para robo e status.**
+- Sugestoes de correcao quando campo, botao, menu ou link nao forem encontrados. **Iniciado.**
 
 Resultado esperado: entender falhas rapidamente.
 
@@ -91,6 +104,15 @@ Melhoria:
 - Capturar cliques, teclas e coordenadas.
 - Gerar passos `desktop_*`.
 - Permitir revisar antes de salvar.
+
+### 5.1 Gravador de navegador
+
+Melhoria:
+
+- Capturar cliques, campos, selecoes e downloads de forma mais limpa. **Iniciado.**
+- Transformar textos digitados em variaveis com nomes amigaveis. **Iniciado.**
+- Trocar campos de senha por credencial, sem salvar valor digitado. **Iniciado.**
+- Reduzir passos duplicados gerados pela gravacao. **Iniciado.**
 
 ### 6. Variaveis amigaveis
 

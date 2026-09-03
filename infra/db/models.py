@@ -49,7 +49,7 @@ class RobotVersion(Base):
 class Run(Base):
     __tablename__ = "runs"
     __table_args__ = (
-        CheckConstraint("status in ('QUEUED', 'RUNNING', 'SUCCESS', 'FAILED')", name="ck_runs_status"),
+        CheckConstraint("status in ('QUEUED', 'RUNNING', 'SUCCESS', 'FAILED', 'CANCELLED')", name="ck_runs_status"),
         Index("ix_runs_created_at", "created_at"),
         Index("ix_runs_status_created_at", "status", "created_at"),
         Index("ix_runs_robot_created_at", "robot_id", "created_at"),
@@ -60,10 +60,17 @@ class Run(Base):
     robot_version_id: Mapped[int] = mapped_column(ForeignKey("robot_versions.id"), nullable=False)
     status: Mapped[str] = mapped_column(String(40), default="QUEUED")
     inputs: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    headless: Mapped[bool] = mapped_column(Boolean, default=False)
+    worker_id: Mapped[int | None] = mapped_column(ForeignKey("workers.id"), nullable=True)
+    worker_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    machine_id: Mapped[str | None] = mapped_column(String(220), nullable=True)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    max_retries: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    cancellation_requested_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     steps: Mapped[list[RunStep]] = relationship(back_populates="run", cascade="all, delete-orphan")
     artifacts: Mapped[list[Artifact]] = relationship(back_populates="run", cascade="all, delete-orphan")
@@ -160,6 +167,7 @@ class Schedule(Base):
     name: Mapped[str] = mapped_column(String(180), nullable=False)
     cron: Mapped[str] = mapped_column(String(120), nullable=False)
     inputs: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    max_retries: Mapped[int] = mapped_column(Integer, default=0)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
