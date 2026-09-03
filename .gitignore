@@ -11,6 +11,7 @@ env/
 *.egg-info/
 
 rpa_hub.db
+*.db-journal
 *.sqlite
 *.sqlite3
 

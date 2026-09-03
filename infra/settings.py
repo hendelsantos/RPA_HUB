@@ -18,9 +18,14 @@ def _parse_csv(value: str | None) -> tuple[str, ...]:
     return tuple(item.strip() for item in value.split(",") if item.strip())
 
 
+def _parse_bool(value: str | None) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "sim", "on"}
+
+
 @dataclass
 class Settings:
     api_key: str | None = None
+    allow_remote_without_api_key: bool = False
     delete_password: str | None = None
     allowed_roots: tuple[Path, ...] = field(default_factory=tuple)
     allowed_commands: tuple[str, ...] = field(default_factory=tuple)
@@ -45,6 +50,7 @@ class Settings:
             raise RuntimeError("RPA_HUB_ALERT_EMAIL_PORT deve ser um numero inteiro.") from exc
         return cls(
             api_key=env.get("RPA_HUB_API_KEY") or None,
+            allow_remote_without_api_key=_parse_bool(env.get("RPA_HUB_ALLOW_REMOTE_WITHOUT_API_KEY")),
             delete_password=env.get("RPA_HUB_DELETE_PASSWORD") or None,
             allowed_roots=tuple(Path(item).expanduser() for item in _parse_csv(env.get("RPA_HUB_ALLOWED_ROOTS"))),
             allowed_commands=_parse_csv(env.get("RPA_HUB_ALLOWED_COMMANDS")),

@@ -79,10 +79,20 @@ def test_non_loopback_denied_without_api_key(monkeypatch):
     from apps.api.rpa_hub_api.auth import require_api_key
 
     monkeypatch.setattr(settings_module.settings, "api_key", None)
+    monkeypatch.setattr(settings_module.settings, "allow_remote_without_api_key", False)
     request = _make_request("/robots", "192.168.1.50")
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(require_api_key(request, None))
     assert exc_info.value.status_code == 401
+
+
+def test_non_loopback_allowed_when_network_mode_is_explicit(monkeypatch):
+    from apps.api.rpa_hub_api.auth import require_api_key
+
+    monkeypatch.setattr(settings_module.settings, "api_key", None)
+    monkeypatch.setattr(settings_module.settings, "allow_remote_without_api_key", True)
+    request = _make_request("/robots", "192.168.1.50")
+    assert asyncio.run(require_api_key(request, None)) is None
 
 
 def test_secret_roundtrip_with_random_ciphertext(client, db_session):

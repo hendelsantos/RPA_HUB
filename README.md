@@ -67,6 +67,23 @@ set RPA_HUB_API_KEY=uma-chave-forte
 start-windows.bat
 ```
 
+Para deixar o Hub aberto na sua rede local sem chave de API:
+
+Linux:
+
+```bash
+APP_NETWORK=1 ./start-linux.sh
+```
+
+Windows:
+
+```bat
+set APP_NETWORK=1
+start-windows.bat
+```
+
+Nesse modo o script sobe em `0.0.0.0`, libera acesso remoto sem credencial e mostra o endereco para abrir de outro computador da rede.
+
 Comando manual equivalente:
 
 ```bash

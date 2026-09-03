@@ -34,7 +34,9 @@ async def require_api_key(request: Request, api_key: str | None = Security(api_k
     host = request.client.host if request.client else ""
     if host in LOOPBACK_HOSTS:
         return
+    if settings.allow_remote_without_api_key:
+        return
     raise HTTPException(
         status_code=401,
-        detail="Acesso remoto bloqueado. Defina a variavel RPA_HUB_API_KEY no servidor e informe a chave no cabecalho X-API-Key.",
+        detail="Acesso remoto bloqueado. Defina RPA_HUB_ALLOW_REMOTE_WITHOUT_API_KEY=1 para abrir na rede local ou use RPA_HUB_API_KEY.",
     )

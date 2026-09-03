@@ -1,8 +1,15 @@
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 
 set APP_HOST=%APP_HOST%
 if "%APP_HOST%"=="" set APP_HOST=127.0.0.1
+
+set APP_NETWORK=%APP_NETWORK%
+if "%APP_NETWORK%"=="" set APP_NETWORK=0
+if "%APP_NETWORK%"=="1" (
+  set APP_HOST=0.0.0.0
+  if "%RPA_HUB_ALLOW_REMOTE_WITHOUT_API_KEY%"=="" set RPA_HUB_ALLOW_REMOTE_WITHOUT_API_KEY=1
+)
 
 set APP_PORT=%APP_PORT%
 if "%APP_PORT%"=="" set APP_PORT=8010
@@ -46,8 +53,13 @@ if errorlevel 1 exit /b 1
 
 if "%APP_HOST%"=="0.0.0.0" (
   if "%RPA_HUB_API_KEY%"=="" (
-    echo AVISO: APP_HOST=0.0.0.0 sem RPA_HUB_API_KEY definida.
-    echo Acessos de outras maquinas serao bloqueados. Defina RPA_HUB_API_KEY para usar o Hub em rede.
+    if "%RPA_HUB_ALLOW_REMOTE_WITHOUT_API_KEY%"=="1" (
+      echo AVISO: Hub aberto na rede local sem chave de API.
+      echo Use somente em rede confiavel.
+    ) else (
+      echo AVISO: APP_HOST=0.0.0.0 sem RPA_HUB_API_KEY definida.
+      echo Acessos de outras maquinas serao bloqueados. Use APP_NETWORK=1 para abrir sem chave na rede local.
+    )
     echo.
   )
 )
@@ -55,6 +67,15 @@ if "%APP_HOST%"=="0.0.0.0" (
 echo.
 echo HUB RPA iniciado em: http://%APP_HOST%:%APP_PORT%
 echo Documentacao da API: http://%APP_HOST%:%APP_PORT%/docs
+if "%APP_HOST%"=="0.0.0.0" (
+  for /f "tokens=2 delims=:" %%A in ('ipconfig ^| findstr /c:"IPv4"') do (
+    set LAN_IP=%%A
+    set LAN_IP=!LAN_IP: =!
+    echo Acesse de outro computador da rede: http://!LAN_IP!:%APP_PORT%
+    goto :printed_ip
+  )
+  :printed_ip
+)
 echo.
 
 python -m uvicorn apps.api.rpa_hub_api.main:app --host %APP_HOST% --port %APP_PORT%
