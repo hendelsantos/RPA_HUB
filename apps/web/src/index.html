@@ -57,6 +57,10 @@
       .stage span { display: block; font-size: 12px; font-weight: 600; margin-top: 3px; }
       .layout { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) 330px; }
       .layout-left { display: grid; gap: 16px; grid-template-columns: 360px minmax(0, 1fr); }
+      .guided-layout { align-items: start; display: grid; gap: 16px; grid-template-columns: minmax(0, 720px) minmax(260px, 1fr); }
+      .guided-panel { border-color: #b7d8cf; box-shadow: 0 10px 30px rgba(9, 107, 90, 0.08); }
+      .guided-row { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .guided-row .wide { grid-column: 1 / -1; }
       .toolbar { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
       .toolbar.end { justify-content: flex-end; }
       .purpose-grid { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -143,14 +147,14 @@
       .key-panel input { width: 100%; }
       .hidden { display: none !important; }
       @media (max-width: 1120px) {
-        .shell, .layout, .layout-left, .metrics, .summary-grid { grid-template-columns: 1fr; }
+        .shell, .layout, .layout-left, .guided-layout, .metrics, .summary-grid { grid-template-columns: 1fr; }
         nav { display: flex; flex-wrap: wrap; gap: 6px; }
         nav h1, nav p { width: 100%; }
         .tab { width: auto; }
       }
       @media (max-width: 680px) {
         main { padding: 12px; }
-        .stages, .purpose-grid, .quick-actions, .step-fields, .filters, .wizard-grid { grid-template-columns: 1fr; }
+        .stages, .purpose-grid, .quick-actions, .guided-row, .step-fields, .filters, .wizard-grid { grid-template-columns: 1fr; }
         .wizard-grid .wide { grid-column: auto; }
         .step-fields .wide { grid-column: auto; }
         .teach-banner { align-items: stretch; flex-direction: column; }
@@ -193,79 +197,83 @@
           </div>
 
           <div id="project-stage" class="stage-panel active">
-            <div class="layout-left">
-              <div class="panel">
+            <div class="guided-layout">
+              <div class="panel guided-panel">
                 <div class="panel-title">
-                  <h3>Novo robo</h3>
-                  <p>Diga o que ele deve fazer. Na proxima tela voce ensina o trabalho no navegador.</p>
+                  <h3>Criar robo</h3>
+                  <p>Responda o basico e o Hub abre a proxima etapa para ensinar ou usar um modelo.</p>
                 </div>
                 <form id="project-form">
-                  <label>Nome do robo</label>
-                  <input name="name" required placeholder="Baixar vendas do dia" />
-                  <label>Qual e a finalidade?</label>
-                  <div class="purpose-grid">
-                    <label class="purpose-card"><input type="radio" name="purpose" value="Baixar arquivos" checked /><strong>Baixar arquivos</strong><small>Excel, PDF, CSV e documentos</small></label>
-                    <label class="purpose-card"><input type="radio" name="purpose" value="Acessar sistemas" /><strong>Acessar sistemas</strong><small>Entrar em portais com credenciais</small></label>
-                    <label class="purpose-card"><input type="radio" name="purpose" value="Preencher formularios" /><strong>Preencher dados</strong><small>Digitar, selecionar e confirmar</small></label>
-                    <label class="purpose-card"><input type="radio" name="purpose" value="Gerar relatorios" /><strong>Gerar relatorios</strong><small>Filtrar, consultar e exportar</small></label>
-                    <label class="purpose-card"><input type="radio" name="purpose" value="Enviar arquivos" /><strong>Enviar arquivos</strong><small>Fazer upload e anexar documentos</small></label>
-                    <label class="purpose-card"><input type="radio" name="purpose" value="Consultar informacoes" /><strong>Consultar dados</strong><small>Pesquisar e coletar resultados</small></label>
-                    <label class="purpose-card"><input type="radio" name="purpose" value="Monitorar sistemas" /><strong>Monitorar sistema</strong><small>Verificar situacoes e mudancas</small></label>
-                    <label class="purpose-card"><input type="radio" name="purpose" value="Capturar evidencias" /><strong>Capturar evidencias</strong><small>Salvar telas e comprovantes</small></label>
-                    <label class="purpose-card"><input type="radio" name="purpose" value="other" /><strong>Outra finalidade</strong><small>Descreva sua propria automacao</small></label>
+                  <div class="guided-row">
+                    <div class="wide">
+                      <label>O que o robo deve fazer?</label>
+                      <select name="purpose">
+                        <option value="Baixar arquivos">Baixar arquivo ou relatorio</option>
+                        <option value="Acessar sistemas">Entrar em um sistema</option>
+                        <option value="Preencher formularios">Preencher dados</option>
+                        <option value="Gerar relatorios">Gerar relatorio</option>
+                        <option value="Organizar arquivos">Organizar arquivos no computador</option>
+                        <option value="Consultar informacoes">Consultar informacoes</option>
+                        <option value="Capturar evidencias">Salvar evidencias</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label>Nome do robo</label>
+                      <input name="name" placeholder="Baixar vendas do dia" />
+                    </div>
+                    <div>
+                      <label>Site ou sistema, se tiver</label>
+                      <input name="start_url" placeholder="https://sistema.empresa.com.br" />
+                    </div>
                   </div>
-                  <div id="custom-purpose-field" class="hidden">
-                    <label>Descreva a finalidade</label>
-                    <input name="custom_purpose" placeholder="Exemplo: comparar precos em dois sistemas" />
-                  </div>
-                  <label>Site inicial, se usar navegador</label>
-                  <input name="start_url" type="url" placeholder="https://sistema.empresa.com.br" />
-                  <label>Detalhes do objetivo</label>
-                  <textarea name="description" placeholder="Exemplo: entrar no menu Vendas, filtrar ontem e baixar em Excel"></textarea>
-                  <div class="toolbar end"><button>Criar e continuar</button></div>
+                  <details>
+                    <summary>Opcional: detalhes do objetivo</summary>
+                    <label>Detalhes</label>
+                    <textarea name="description" placeholder="Exemplo: entrar no menu Vendas, filtrar ontem e baixar em Excel"></textarea>
+                  </details>
+                  <div class="toolbar end"><button>Criar robo</button></div>
                 </form>
-                <div class="callout">Quer experimentar primeiro? Crie um robo de teste pronto e veja como as tres etapas funcionam.</div>
-                <div class="toolbar">
-                  <button id="create-demo" class="secondary">Criar teste pronto</button>
-                  <button id="import-robot" class="secondary" type="button">Restaurar backup</button>
-                  <input id="import-robot-file" class="hidden" type="file" accept="application/json,.json" />
-                </div>
-                <div class="panel-title" style="margin-top:20px">
-                  <h3>Comecar rapido</h3>
-                  <p>Escolha um ponto de partida e preencha os nomes dos campos depois.</p>
-                </div>
-                <div class="quick-actions">
-                  <button type="button" class="secondary" onclick="quickStart('system_download')">Baixar arquivo de sistema</button>
-                  <button type="button" class="secondary" onclick="quickStart('google_search')">Pesquisar no Google</button>
-                  <button type="button" class="secondary" onclick="quickStart('site_login')">Entrar em site com senha</button>
-                  <button type="button" class="secondary" onclick="quickStart('files')">Organizar arquivos</button>
-                </div>
                 <p class="message" id="project-message"></p>
-              </div>
-              <div class="panel">
-                <div class="panel-title">
-                  <h3>Criar robo de download</h3>
-                  <p>Preencha como o sistema aparece para voce. O Hub monta os passos automaticamente.</p>
-                </div>
-                <form id="download-wizard-form">
-                  <div class="wizard-grid">
-                    <div class="wide"><label>Nome do robo</label><input name="robot_name" required placeholder="Baixar relatorio por modelo" /></div>
-                    <div class="wide"><label>Site do sistema</label><input name="site" required placeholder="https://sistema.empresa.com.br" /></div>
-                    <div><label>Usuario</label><input name="usuario" required placeholder="meu.usuario" /></div>
-                    <div><label>Credencial de senha</label><input name="senha_credencial" required placeholder="portal.password" /></div>
-                    <div><label>Nome do arquivo</label><input name="arquivo" value="relatorio-{{modelo}}-{{run_date}}.xlsx" /></div>
-                    <div><label>Campo do usuario</label><input name="campo_usuario" value="Usuario" /></div>
-                    <div><label>Campo da senha</label><input name="campo_senha" value="Senha" /></div>
-                    <div><label>Botao de entrar</label><input name="botao_entrar" value="Entrar" /></div>
-                    <div><label>Aba ou menu</label><input name="menu" value="Relatorios" /></div>
-                    <div><label>Campo do modelo</label><input name="campo_modelo" value="Modelo" /></div>
-                    <div><label>Modelo padrao</label><input name="modelo" required placeholder="Nome do modelo" /></div>
-                    <div><label>Botao filtrar</label><input name="botao_filtrar" value="Filtrar" /></div>
-                    <div><label>Botao baixar</label><input name="botao_baixar" value="Baixar" /></div>
+                <details>
+                  <summary>Opcoes avancadas</summary>
+                  <div class="toolbar">
+                    <button id="create-demo" class="secondary" type="button">Criar teste pronto</button>
+                    <button id="import-robot" class="secondary" type="button">Restaurar backup</button>
+                    <input id="import-robot-file" class="hidden" type="file" accept="application/json,.json" />
                   </div>
-                  <div class="toolbar end"><button>Criar robo pronto</button></div>
-                </form>
-                <p class="message" id="wizard-message"></p>
+                  <div class="panel-title" style="margin-top:16px">
+                    <h3>Modelos rapidos</h3>
+                    <p>Crie o robo acima, depois escolha um ponto de partida.</p>
+                  </div>
+                  <div class="quick-actions">
+                    <button type="button" class="secondary" onclick="quickStart('system_download')">Baixar arquivo</button>
+                    <button type="button" class="secondary" onclick="quickStart('google_search')">Pesquisar</button>
+                    <button type="button" class="secondary" onclick="quickStart('site_login')">Login</button>
+                    <button type="button" class="secondary" onclick="quickStart('files')">Arquivos</button>
+                  </div>
+                </details>
+                <details>
+                  <summary>Criar robo de download com campos prontos</summary>
+                  <form id="download-wizard-form">
+                    <div class="wizard-grid">
+                      <div class="wide"><label>Nome do robo</label><input name="robot_name" required placeholder="Baixar relatorio por modelo" /></div>
+                      <div class="wide"><label>Site do sistema</label><input name="site" required placeholder="https://sistema.empresa.com.br" /></div>
+                      <div><label>Usuario</label><input name="usuario" required placeholder="meu.usuario" /></div>
+                      <div><label>Credencial de senha</label><input name="senha_credencial" required placeholder="portal.password" /></div>
+                      <div><label>Nome do arquivo</label><input name="arquivo" value="relatorio-{{modelo}}-{{run_date}}.xlsx" /></div>
+                      <div><label>Campo do usuario</label><input name="campo_usuario" value="Usuario" /></div>
+                      <div><label>Campo da senha</label><input name="campo_senha" value="Senha" /></div>
+                      <div><label>Botao de entrar</label><input name="botao_entrar" value="Entrar" /></div>
+                      <div><label>Aba ou menu</label><input name="menu" value="Relatorios" /></div>
+                      <div><label>Campo do modelo</label><input name="campo_modelo" value="Modelo" /></div>
+                      <div><label>Modelo padrao</label><input name="modelo" required placeholder="Nome do modelo" /></div>
+                      <div><label>Botao filtrar</label><input name="botao_filtrar" value="Filtrar" /></div>
+                      <div><label>Botao baixar</label><input name="botao_baixar" value="Baixar" /></div>
+                    </div>
+                    <div class="toolbar end"><button>Criar robo pronto</button></div>
+                  </form>
+                  <p class="message" id="wizard-message"></p>
+                </details>
               </div>
               <div class="panel">
                 <div class="panel-title">
@@ -1661,11 +1669,30 @@
       }
       document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => activateTab(tab.dataset.view)));
       document.querySelectorAll(".stage").forEach((stage) => stage.addEventListener("click", () => showStage(stage.dataset.stage)));
-      document.querySelectorAll('input[name="purpose"]').forEach((input) => input.addEventListener("change", () => {
-        const custom = document.querySelector('input[name="purpose"]:checked').value === "other";
-        document.querySelector("#custom-purpose-field").classList.toggle("hidden", !custom);
-        document.querySelector('[name="custom_purpose"]').required = custom;
-      }));
+      function suggestedRobotName(purpose) {
+        const names = {
+          "Baixar arquivos": "Baixar relatorio",
+          "Acessar sistemas": "Entrar no sistema",
+          "Preencher formularios": "Preencher dados",
+          "Gerar relatorios": "Gerar relatorio",
+          "Organizar arquivos": "Organizar arquivos",
+          "Consultar informacoes": "Consultar informacoes",
+          "Capturar evidencias": "Salvar evidencias",
+        };
+        return names[purpose] || "Novo robo";
+      }
+      function guidedTemplateFor(purpose) {
+        const templates = {
+          "Baixar arquivos": "system_download",
+          "Acessar sistemas": "site_login",
+          "Preencher formularios": "site_login",
+          "Gerar relatorios": "system_download",
+          "Organizar arquivos": "local_report",
+          "Consultar informacoes": "google_search",
+          "Capturar evidencias": "open_site",
+        };
+        return templates[purpose] || "open_site";
+      }
       document.querySelector("#step-type").addEventListener("change", updateStepFormFields);
       document.querySelector("#input-form").addEventListener("submit", (event) => {
         event.preventDefault();
@@ -1682,15 +1709,18 @@
         event.preventDefault();
         const data = Object.fromEntries(new FormData(event.target).entries());
         try {
-          const purpose = data.purpose === "other" ? data.custom_purpose : data.purpose;
-          const robot = await api("/robots", { method: "POST", body: JSON.stringify({ name: data.name, start_url: data.start_url || null, description: `${purpose}. ${data.description || ""}`.trim() }) });
+          const purpose = data.purpose || "Baixar arquivos";
+          const startUrl = normalizeUrl(data.start_url || "");
+          if (startUrl) checkUrlBeforeUse(startUrl, "Site ou sistema");
+          const name = String(data.name || suggestedRobotName(purpose)).trim();
+          const robot = await api("/robots", { method: "POST", body: JSON.stringify({ name, start_url: startUrl || null, description: `${purpose}. ${data.description || ""}`.trim() }) });
           event.target.reset();
-          document.querySelector("#custom-purpose-field").classList.add("hidden");
-          document.querySelector('[name="custom_purpose"]').required = false;
           await refreshAll();
           await selectRobot(robot.id);
+          if (startUrl) visualInputs.site = startUrl;
           showStage("teach");
-          setMessage("#robot-message", "Robo criado. Use Gravar site para navegador ou Ferramentas avancadas para acoes locais.", "good");
+          addTemplateSteps(guidedTemplateFor(purpose));
+          setMessage("#robot-message", "Robo criado com um ponto de partida. Confira os passos, ajuste o que precisar e salve.", "good");
         } catch (error) { setMessage("#project-message", error.message, "bad"); }
       });
       document.querySelector("#download-wizard-form").addEventListener("submit", async (event) => {
