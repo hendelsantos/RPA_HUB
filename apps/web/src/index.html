@@ -71,6 +71,10 @@
       .purpose-card small { color: var(--muted); display: block; font-size: 12px; line-height: 1.4; margin-top: 4px; }
       .quick-actions { display: grid; gap: 8px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 12px; }
       .quick-actions button { min-height: 54px; text-align: left; }
+      .start-actions { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 12px; }
+      .start-actions button { align-items: flex-start; display: flex; flex-direction: column; gap: 4px; min-height: 68px; text-align: left; }
+      .start-actions small { color: rgba(255, 255, 255, .78); font-size: 12px; font-weight: 600; line-height: 1.35; }
+      .start-actions .secondary small { color: var(--muted); }
       .wizard-grid { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .wizard-grid .wide { grid-column: 1 / -1; }
       .robot-list { display: grid; gap: 8px; }
@@ -116,6 +120,17 @@
       .compact-item:last-child { border-bottom: 0; }
       .compact-item strong { display: block; font-size: 13px; }
       .compact-item small { color: var(--muted); display: block; font-size: 12px; line-height: 1.45; margin-top: 3px; }
+      .setup-guide { background: #fbfcfd; border: 1px solid var(--line); border-radius: 8px; margin-top: 14px; padding: 13px; }
+      .setup-guide h4 { font-size: 14px; margin: 0 0 8px; }
+      .setup-step { align-items: flex-start; border-top: 1px solid var(--line); display: flex; gap: 9px; padding: 10px 0; }
+      .setup-step:first-of-type { border-top: 0; padding-top: 0; }
+      .setup-dot { border-radius: 999px; display: inline-flex; flex: 0 0 24px; font-size: 12px; font-weight: 800; height: 24px; justify-content: center; line-height: 24px; margin-top: 1px; width: 24px; }
+      .setup-step.done .setup-dot { background: #dcfce7; color: var(--good); }
+      .setup-step.todo .setup-dot { background: #fff1d6; color: var(--warn); }
+      .setup-step strong { display: block; font-size: 13px; }
+      .setup-step small { color: var(--muted); display: block; font-size: 12px; line-height: 1.4; margin-top: 2px; }
+      .setup-next { background: var(--brand-soft); border: 1px solid #b7d8cf; border-radius: 8px; margin-top: 10px; padding: 11px; }
+      .setup-next strong { display: block; font-size: 13px; margin-bottom: 8px; }
       .filters { align-items: end; display: grid; gap: 10px; grid-template-columns: minmax(160px, 1fr) minmax(140px, 220px) auto; margin: 12px 0; }
       .table-wrap { overflow: auto; }
       .table { border-collapse: collapse; width: 100%; }
@@ -154,7 +169,7 @@
       }
       @media (max-width: 680px) {
         main { padding: 12px; }
-        .stages, .purpose-grid, .quick-actions, .guided-row, .step-fields, .filters, .wizard-grid { grid-template-columns: 1fr; }
+        .stages, .purpose-grid, .quick-actions, .start-actions, .guided-row, .step-fields, .filters, .wizard-grid { grid-template-columns: 1fr; }
         .wizard-grid .wide { grid-column: auto; }
         .step-fields .wide { grid-column: auto; }
         .teach-banner { align-items: stretch; flex-direction: column; }
@@ -202,6 +217,16 @@
                 <div class="panel-title">
                   <h3>Criar robo</h3>
                   <p>Responda o basico e o Hub abre a proxima etapa para ensinar ou usar um modelo.</p>
+                </div>
+                <div class="start-actions">
+                  <button type="button" onclick="startSiteRobot()">
+                    Automatizar site
+                    <small>Entrar, clicar, preencher e baixar arquivos</small>
+                  </button>
+                  <button type="button" class="secondary" onclick="startLocalRobot()">
+                    Automatizar meu PC
+                    <small>Pastas, arquivos, comandos e area de trabalho</small>
+                  </button>
                 </div>
                 <form id="project-form">
                   <div class="guided-row">
@@ -281,6 +306,7 @@
                   <p>Selecione um robo para continuar ensinando ou programar a execucao.</p>
                 </div>
                 <div class="robot-list" id="robot-list"></div>
+                <div id="project-setup-guide"></div>
               </div>
             </div>
           </div>
@@ -429,6 +455,7 @@
                   <p>O ensino sera salvo no robo selecionado.</p>
                 </div>
                 <div class="robot-list" id="teach-robot-list"></div>
+                <div id="teach-setup-guide"></div>
                 <div class="panel-title" style="margin-top:20px">
                   <h3>Credenciais deste robo</h3>
                   <p>Vincule credenciais ja cadastradas para usar em passos de login.</p>
@@ -844,6 +871,7 @@
             : '<div class="empty">Este robo nao possui entradas configuradas.</div>';
         }
         syncJson();
+        renderSetupGuides();
       }
       function removeInput(key) {
         delete visualInputs[key];
@@ -851,6 +879,150 @@
       }
       function ensureInput(key, value) {
         if (!(key in visualInputs)) visualInputs[key] = value;
+      }
+      function activeWorkflowSteps() {
+        return (visualSteps || []).filter((step) => !isStepDisabled(step));
+      }
+      function requiredSecretRefs() {
+        return [...new Set(activeWorkflowSteps().flatMap((step) => {
+          const refs = [];
+          if (step.type === "secret_fill" && step.secret) refs.push(step.secret);
+          if (step.type === "email_send" && step.password_secret) refs.push(step.password_secret);
+          return refs;
+        }))];
+      }
+      function linkedSecretRefs() {
+        return new Set((robotSecrets || []).flatMap((item) => [item.alias, item.secret_name].filter(Boolean)));
+      }
+      function usesDesktop() {
+        return activeWorkflowSteps().some((step) => String(step.type || "").startsWith("desktop_"));
+      }
+      function setupChecks() {
+        const steps = activeWorkflowSteps();
+        const requiredSecrets = requiredSecretRefs();
+        const linkedSecrets = linkedSecretRefs();
+        const missingSecrets = requiredSecrets.filter((ref) => !linkedSecrets.has(ref));
+        const desktopNeeded = usesDesktop();
+        return [
+          {
+            ok: Boolean(selectedRobot),
+            label: "Robo criado",
+            detail: selectedRobot ? selectedRobot.name : "Comece criando um robo de site ou de computador.",
+            action: "project",
+            button: "Criar robo",
+          },
+          {
+            ok: steps.length > 0,
+            label: "Passos ensinados",
+            detail: steps.length ? `${steps.length} passo(s) ativos.` : "Grave um site ou escolha um modelo pronto.",
+            action: "teach",
+            button: "Ensinar agora",
+          },
+          {
+            ok: !desktopNeeded || Boolean(environment.desktop?.available),
+            label: "Controle do computador",
+            detail: !desktopNeeded ? "Este robo nao precisa controlar mouse e teclado." : (environment.desktop?.message || "Desktop disponivel."),
+            action: "teach",
+            button: "Ajustar passos",
+          },
+          {
+            ok: missingSecrets.length === 0,
+            label: "Credenciais vinculadas",
+            detail: requiredSecrets.length ? (missingSecrets.length ? `Falta vincular: ${missingSecrets.join(", ")}.` : "Credenciais prontas.") : "Este robo nao usa senha salva.",
+            action: "secrets",
+            button: "Vincular senha",
+          },
+          {
+            ok: selectedRobot?.status === "active",
+            label: "Robo ativado",
+            detail: selectedRobot?.status === "active" ? "Pode executar quando quiser." : "Salve e teste para aprovar a versao atual.",
+            action: "test",
+            button: "Salvar e testar",
+          },
+        ];
+      }
+      function nextSetupAction(checks) {
+        return checks.find((check) => !check.ok) || {
+          ok: true,
+          label: "Tudo pronto",
+          detail: "Execute agora ou crie uma agenda para rodar automaticamente.",
+          action: "execution",
+          button: "Executar ou agendar",
+        };
+      }
+      function runSetupAction(action) {
+        if (action === "project") {
+          showStage("project");
+          document.querySelector('#project-form [name="name"]')?.focus();
+          return;
+        }
+        if (action === "teach") {
+          showStage("teach");
+          return;
+        }
+        if (action === "secrets") {
+          showStage("teach");
+          document.querySelector("#robot-secret-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
+        if (action === "test") {
+          prepareAndRunSelected(false);
+          return;
+        }
+        if (action === "execution") {
+          showStage("execution");
+        }
+      }
+      function renderSetupGuides() {
+        const targets = ["#project-setup-guide", "#teach-setup-guide"];
+        if (!targets.some((selector) => document.querySelector(selector))) return;
+        const checks = setupChecks();
+        const next = nextSetupAction(checks);
+        const html = `
+          <div class="setup-guide">
+            <h4>Guia para colocar em uso</h4>
+            ${checks.map((check) => `
+              <div class="setup-step ${check.ok ? "done" : "todo"}">
+                <span class="setup-dot">${check.ok ? "OK" : "!"}</span>
+                <div><strong>${esc(check.label)}</strong><small>${esc(check.detail)}</small></div>
+              </div>`).join("")}
+            <div class="setup-next">
+              <strong>${esc(next.ok ? next.detail : `Proximo passo: ${next.detail}`)}</strong>
+              <button type="button" class="${next.ok ? "" : "secondary"}" onclick="runSetupAction('${esc(next.action)}')">${esc(next.button)}</button>
+            </div>
+          </div>`;
+        targets.forEach((selector) => {
+          const container = document.querySelector(selector);
+          if (container) container.innerHTML = html;
+        });
+      }
+      function startSiteRobot() {
+        showStage("project");
+        const form = document.querySelector("#project-form");
+        form.elements.purpose.value = "Baixar arquivos";
+        if (!form.elements.name.value) form.elements.name.value = "Baixar relatorio";
+        form.elements.start_url.focus();
+        setMessage("#project-message", "Informe o site do sistema e clique em Criar robo. O Hub ja vai sugerir passos de login/download.", "good");
+      }
+      async function startLocalRobot() {
+        try {
+          const name = window.prompt("Nome do robo para automatizar sua maquina:", "Organizar arquivos no computador");
+          if (name === null) return;
+          const robot = await api("/robots", {
+            method: "POST",
+            body: JSON.stringify({
+              name: String(name || "Organizar arquivos no computador").trim(),
+              start_url: null,
+              description: "Automacao local de arquivos, pastas, comandos ou desktop.",
+            }),
+          });
+          await refreshAll();
+          await selectRobot(robot.id);
+          addTemplateSteps("local_report");
+          await saveWorkflow();
+          showStage("teach");
+          setMessage("#robot-message", "Robo local criado com modelo pronto. Ajuste caminhos e clique em Salvar e testar.", "good");
+        } catch (error) { setMessage("#project-message", error.message, "bad"); }
       }
       function buildSystemDownloadWorkflow(data) {
         return {
@@ -1157,6 +1329,7 @@
         document.querySelector("#teach-robot-list").innerHTML = content;
         renderRunRobotFilter();
         renderPanelRobotSelect();
+        renderSetupGuides();
       }
       function renderPanelRobotSelect() {
         const select = document.querySelector("#panel-robot-select");
@@ -1198,6 +1371,7 @@
               </div>
             </div>`).join("")
           : '<div class="empty">Nenhuma credencial vinculada a este robo.</div>';
+        renderSetupGuides();
       }
       async function loadRobots() { robots = await api("/robots"); renderRobotLists(); }
       async function loadRobotSecrets() {
@@ -1224,6 +1398,7 @@
         renderSteps();
         renderInputs();
         renderRobotLists();
+        renderSetupGuides();
       }
       async function saveWorkflow() {
         if (!selectedVersion) throw new Error("Selecione um robo.");
@@ -1388,6 +1563,7 @@
           button.disabled = !desktop.available;
           button.title = desktop.available ? "" : box.textContent;
         });
+        renderSetupGuides();
       }
       async function refreshAll() {
         await Promise.all([loadLogSummary(), loadRobots(), loadRuns(), loadSecrets(), loadSchedules(), loadEnvironment()]);
